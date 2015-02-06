@@ -63,8 +63,8 @@ class User(Actor):
 
     __mapper_args__ = {"polymorphic_identity": "user"}
 
-    def __repr__(self):
-        return "<User(username='%s', password='%s')>" % (self.username)
+    #def __repr__(self):
+    #    return "<User(username='%s')>" % self.username
 
 ##############################################################################
 
@@ -142,8 +142,16 @@ class State(Base):
     fsm = Column("fsm", String(length=32), nullable=False)
     name = Column("name", String(length=64), nullable=False)
     
-    __mapper_args__ = {'polymorphic_on': fsm}
+    __mapper_args__ = {"polymorphic_identity": "state", 'polymorphic_on': fsm}
+
+class ArtifactState(State):
+    __tablename__ = "artifactstate"
     
+    id = Column("id", Integer, ForeignKey("state.id"),
+                nullable=False, primary_key=True)
+    
+    __mapper_args__ = {"polymorphic_identity": "artifactstate"}
+
 ##############################################################################
 
 class Resource(Base):
