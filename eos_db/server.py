@@ -106,6 +106,16 @@ def list_servers_in_state(state):
     session.close() 
     return result
 
+def list_server_in_state(state):
+    Session = sessionmaker(bind=engine)
+    session = Session()
+    servers = session.query(Artifact.id).all()
+    stated_server = None
+    for server in servers:
+        if _get_most_recent_artifact_state(server[0])[0] == state:
+            stated_server = server[0]
+    return stated_server
+
 def touch_to_add_ownership(artifact_id, user_id):
     touch_id=create_touch(None, artifact_id, None)
     ownership_id=create_ownership(touch_id, user_id)
@@ -169,7 +179,7 @@ def check_progress(job_id):
 ##############################################################################
     
 def touch_to_add_password(actor_id, password):
-    touch_id = create_touch(actor_id, None, None)
+    touch_id = _create_touch(actor_id, None, None)
     password_id = create_password(touch_id, password)
     return password_id
 

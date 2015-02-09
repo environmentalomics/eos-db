@@ -134,7 +134,7 @@ def retrieve_servers(request):
 
 @view_config(request_method="GET", route_name='states', renderer='json')
 def retrieve_servers_in_state(request):
-    server_list = server.list_servers_in_state(request.GET['state'])
+    server_list = server.list_server_in_state(request.GET['state'])
     return server_list
 
 # Server-related API calls - Individual Servers
