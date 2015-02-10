@@ -114,6 +114,7 @@ def list_server_in_state(state):
     for server in servers:
         if _get_most_recent_artifact_state(server[0])[0] == state:
             stated_server = server[0]
+    session.close()
     return stated_server
 
 def touch_to_add_ownership(artifact_id, user_id):

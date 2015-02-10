@@ -62,6 +62,11 @@ def main(global_config, **settings):
     
     config.add_route('server_start', '/servers/{name}/start')
     config.add_route('server_stop', '/servers/{name}/stop')
+    
+    config.add_route('server_stopped', '/servers/{name}/stopped')
+    config.add_route('server_started', '/servers/{name}/started')
+    
+    
     config.add_route('server_suspend', '/servers/{name}/suspend')
     
     config.add_route('server_owner', '/servers/{name}/owner')

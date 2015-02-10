@@ -186,6 +186,26 @@ def stop_server(request):
     newname = server.touch_to_prestop(request.POST['vm_id'])
     return newname
 
+@view_config(request_method="POST", route_name='server_stopped', renderer='json')
+def stopped_server(request):
+    """Put a server into the "pre-stop" status.
+    
+    :param vm_id: ID of VApp which we want to stop.
+    :returns: JSON containing VApp ID and job ID for progress calls.
+    """   
+    newname = server.touch_to_stop(request.POST['vm_id'])
+    return newname
+
+@view_config(request_method="POST", route_name='server_started', renderer='json')
+def started_server(request):
+    """Put a server into the "pre-stop" status.
+    
+    :param vm_id: ID of VApp which we want to stop.
+    :returns: JSON containing VApp ID and job ID for progress calls.
+    """   
+    newname = server.touch_to_start(request.POST['vm_id'])
+    return newname
+
 @view_config(request_method="GET", route_name='server_job_status', renderer='json')
 def retrieve_job_progress(request):
     """Put a server into the "pre-stop" status.
