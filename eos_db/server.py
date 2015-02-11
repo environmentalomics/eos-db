@@ -29,6 +29,12 @@ def override_engine(engine_string):
     global engine
     engine = create_engine(engine_string, echo=True)
 
+def deploy_tables():
+    """Create tables in their current state in the currently connected
+    database.
+    """
+    Base.metadata.create_all(engine)
+
 def create_user(type, handle, name, username):
     """Create a new user record. 
     
@@ -118,7 +124,7 @@ def list_server_in_state(state):
     return stated_server
 
 def touch_to_add_ownership(artifact_id, user_id):
-    touch_id=create_touch(None, artifact_id, None)
+    touch_id=_create_touch(None, artifact_id, None)
     ownership_id=create_ownership(touch_id, user_id)
     return ownership_id
 
