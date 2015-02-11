@@ -10,7 +10,7 @@ from SQLAlchemy.
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, DateTime, CHAR, ForeignKey
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from eos_db.settings import DBDetails as DB
 
@@ -151,6 +151,9 @@ class ArtifactState(State):
                 nullable=False, primary_key=True)
     
     __mapper_args__ = {"polymorphic_identity": "artifactstate"}
+    __table_args__ = (CheckConstraint(State.name in ['Stopped', 'Starting', 'Started', 
+                                               'Boosting', 'Boosted','Deboosting',
+                                               'Suspending', 'Suspended', 'Stopping']),)
 
 ##############################################################################
 
@@ -224,12 +227,29 @@ class Credit(Resource):
     """ Primary key. """
     
     credit = Column("credit", Integer, nullable=False)
-    """The amound by which we are changing the user's account balance. 
+    """The amount by which we are changing the user's account balance. 
     Negative integers represent debits from the account. The integer type used
     to define the credit runs from -2147483648 to +2147483647 when implemented
     in Postgres."""
 
     __mapper_args__ = {"polymorphic_identity": "credit"}
+
+class Specification(Resource):
+    """Represents a given set of configuration options for an artifact.
+    """
+    __tablename__ = "specification"
+
+    id = Column("id", Integer, ForeignKey("resource.id"),
+                nullable=False, primary_key=True)
+        
+    cores = Column("cores", Integer, nullable=False)
+    """The number of cores which we wish a machine to have."""
+    
+    ram = Column("ram", Integer, nullable=False)
+    """The amount of RAM which we want allocated to the system."""
+
+    __mapper_args__ = {"polymorphic_identity": "specification"}
+    
 
 class Ownership(Resource):
     """
