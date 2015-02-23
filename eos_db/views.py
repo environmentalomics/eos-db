@@ -16,12 +16,28 @@ from eos_db import server
 
 ##############################################################################
 
+# Home View
+
+@view_config(request_method="GET", route_name='home', renderer='json')
+def home_view(request):
+    return None
+
 # OPTIONS call result
 
 @view_config(request_method="OPTIONS", route_name='server_start', renderer='json')
 @view_config(request_method="OPTIONS", route_name='server_stop', renderer='json')
 def options(request):
     return "None"
+
+# Views for setting up test databases
+
+@view_config(request_method="POST", route_name='setup_states', renderer='json')
+def setup_states(request):
+    return None
+
+@view_config(request_method="POST", route_name='setup', renderer='json')
+def setup(request):
+    return None
 
 # User-related API calls - All users
 
@@ -147,7 +163,9 @@ def create_server(request):
 @view_config(request_method="GET", route_name='server', renderer='json')
 def retrieve_server(request):
     name = request.matchdict['name']
-    return name
+    server_id = server.get_server_id_from_name(name)
+    server_details = server.return_artifact_details(server_id)
+    return server_details
 
 @view_config(request_method="PATCH", route_name='server', renderer='json')
 def update_server(request):
@@ -186,9 +204,30 @@ def stop_server(request):
     newname = server.touch_to_prestop(request.POST['vm_id'])
     return newname
 
+@view_config(request_method="POST", route_name='server_prepare', renderer='json')
+def prepare_server(request):
+    """Put a server into the "pre-stop" status.
+    
+    :param vm_id: ID of VApp which we want to stop.
+    :returns: JSON containing VApp ID and job ID for progress calls.
+    """   
+    newname = server.touch_to_prepare(request.POST['vm_id'])
+    return newname
+
+@view_config(request_method="POST", route_name='server_boost', renderer='json')
+def boost_server(request):
+    """Put a server into the "pre-boost" status.
+    
+    :param vm_id: ID of VApp which we want to stop.
+    :returns: JSON containing VApp ID and job ID for progress calls.
+    """   
+    newname = server.touch_to_boost(request.POST['vm_id'])
+    return newname
+
+
 @view_config(request_method="POST", route_name='server_stopped', renderer='json')
 def stopped_server(request):
-    """Put a server into the "pre-stop" status.
+    """Put a server into the "Stopping" status.
     
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
@@ -198,12 +237,22 @@ def stopped_server(request):
 
 @view_config(request_method="POST", route_name='server_started', renderer='json')
 def started_server(request):
-    """Put a server into the "pre-stop" status.
+    """Put a server into the "Starting" status.
     
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """   
     newname = server.touch_to_start(request.POST['vm_id'])
+    return newname
+
+@view_config(request_method="POST", route_name='server_prepared', renderer='json')
+def prepared_server(request):
+    """Put a server into the "Starting" status.
+    
+    :param vm_id: ID of VApp which we want to stop.
+    :returns: JSON containing VApp ID and job ID for progress calls.
+    """   
+    newname = server.touch_to_prepared(request.POST['vm_id'])
     return newname
 
 @view_config(request_method="GET", route_name='server_job_status', renderer='json')

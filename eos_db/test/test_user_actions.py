@@ -1,5 +1,6 @@
 import unittest
-from eos_db.models import Base, User, engine
+from eos_db.models import Base, User
+from eos_db.server import engine
 from sqlalchemy.orm import sessionmaker
 
 class TestUserActions(unittest.TestCase):

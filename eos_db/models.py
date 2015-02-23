@@ -7,6 +7,7 @@ from SQLAlchemy.
 
 ##############################################################################
 
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, DateTime, CHAR, ForeignKey
@@ -14,10 +15,7 @@ from sqlalchemy import UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from eos_db.settings import DBDetails as DB
 
-engine = create_engine('postgresql://' + DB.username + ':' + DB.password + '@localhost:5432/eos_db', echo=True)
 Base = declarative_base()
-
-##############################################################################
 
 class Actor(Base):
     """
@@ -151,9 +149,9 @@ class ArtifactState(State):
                 nullable=False, primary_key=True)
     
     __mapper_args__ = {"polymorphic_identity": "artifactstate"}
-    __table_args__ = (CheckConstraint(State.name in ['Stopped', 'Starting', 'Started', 
-                                               'Boosting', 'Boosted','Deboosting',
-                                               'Suspending', 'Suspended', 'Stopping']),)
+    #__table_args__ = (CheckConstraint(State.name in ['Stopped', 'Starting', 'Started', 
+    #                                           'Boosting', 'Boosted','Deboosting',
+    #                                           'Suspending', 'Suspended', 'Stopping']),)
 
 ##############################################################################
 

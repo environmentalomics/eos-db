@@ -1,6 +1,8 @@
 from pyramid.config import Configurator
 from pyramid.events import NewRequest
 import logging
+import os
+import eos_db.server
 
 ALLOWED_ORIGIN = ('http://localhost:6542', )
 
@@ -21,10 +23,18 @@ def add_cors_headers_response_callback(event):
 def main(global_config, **settings):
     config = Configurator(settings=settings)
     config.add_subscriber(add_cors_headers_response_callback, NewRequest)
+    
+    settings = config.registry.settings
+    server.choose_engine(settings['server'])
             
     # Top-level home page. Yields API call list?
     
     config.add_route('home', '/')
+    
+    # Test setup calls
+    
+    config.add_route('setup', '/setup')
+    config.add_route('setup_states', '/setup_states')
     
     # Session API calls
     
@@ -58,20 +68,27 @@ def main(global_config, **settings):
                                                     # Post new server or
                                                     # Delete server
     
+    # Server state-related calls.
+    
     config.add_route('states', '/states/{name}') # Get list of servers in given state.
     
     config.add_route('server_start', '/servers/{name}/start')
     config.add_route('server_stop', '/servers/{name}/stop')
     
-    config.add_route('server_stopped', '/servers/{name}/stopped')
     config.add_route('server_started', '/servers/{name}/started')
+    config.add_route('server_stopped', '/servers/{name}/stopped')
     
+    config.add_route('server_prepare', '/servers/{name}/prepare')
+    config.add_route('server_prepared', '/servers/{name}/prepared')
+    
+    config.add_route('server_boost', '/servers/{name}/boost')
+    config.add_route('server_boosted', '/servers/{name}/boosted')
     
     config.add_route('server_suspend', '/servers/{name}/suspend')
     
     config.add_route('server_owner', '/servers/{name}/owner')
     config.add_route('server_touches', '/servers/{name}/touches') 
-    config.add_route('server_job_status', '/servers/{name}/job/{job}/status')                                        # Get server touches
+    config.add_route('server_job_status', '/servers/{name}/job/{job}/status')  # Get server touches
                  
     config.scan()
     return config.make_wsgi_app()
