@@ -11,6 +11,7 @@ docs/_build/html/_sources/setup.txt
 eos_db/__init__.py
 eos_db/models.py
 eos_db/server.py
+eos_db/settings.py
 eos_db/views.py
 eos_db.egg-info/PKG-INFO
 eos_db.egg-info/SOURCES.txt
@@ -20,5 +21,8 @@ eos_db.egg-info/not-zip-safe
 eos_db.egg-info/requires.txt
 eos_db.egg-info/top_level.txt
 eos_db/test/__init__.py
+eos_db/test/dummy_server.py
 eos_db/test/test_credits.py
-eos_db/test/test_server.py
+eos_db/test/test_test.py
+eos_db/test/test_user_actions.py
+eos_db/test/test_vm_actions.py

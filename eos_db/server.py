@@ -397,7 +397,7 @@ def check_password(actor_id, password):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     our_password = session.query(Password).filter_by(password=password).filter(Password.touch_id==Touch.
-id).filter(Touch.actor_id==actor_id).first()
+id).filter(Touch.actor_id==Actor.id).filter(Actor.handle==actor_id).first()
     session.close()
     if our_password is None:
         return False
@@ -447,7 +447,7 @@ def check_credit(actor_id):
     
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    credit = session.query(func.sum(Credit.credit)).filter(Credit.touch_id==Touch.id).filter(Touch.actor_id==actor_id).scalar()
+    credit = session.query(func.sum(Credit.credit)).filter(Credit.touch_id==Touch.id).filter(Touch.actor_id==Actor.id).filter(Actor.handle==actor_id).scalar()
     
     session.close()
     return credit
@@ -460,7 +460,7 @@ def check_actor_id(actor_id):
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    if session.query(Actor).filter(Actor.id==actor_id).count() > 0:   
+    if session.query(Actor).filter(Actor.handle==actor_id).count() > 0:   
         session.close()
         return True
     else:
@@ -475,7 +475,7 @@ def check_user_details(user_id):
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    our_user = session.query(User).filter_by(id=user_id).first()
+    our_user = session.query(User).filter_by(handle=user_id).first()
     session.close()
     return {'id':our_user.id, 'username': our_user.username, 'name': our_user.name}
             
@@ -497,7 +497,8 @@ def _list_artifacts_for_user(user_id):
     servers = session.query(Artifact.id, Artifact.uuid) \
                 .filter(Artifact.id == Touch.artifact_id) \
                 .filter(Touch.id == Ownership.touch_id) \
-                .filter(Ownership.user_id == user_id) \
+                .filter(Ownership.user_id == Actor.id) \
+                .filter(Actor.handle == user_id) \
                 .distinct(Artifact.id).all()
     session.close()
     return servers

@@ -68,6 +68,8 @@ def main(global_config, **settings):
                                                     # Post new server or
                                                     # Delete server
     
+    config.add_route('server_by_id', '/servers/by_id/{name}')
+    
     # Server state-related calls.
     
     config.add_route('states', '/states/{name}') # Get list of servers in given state.
@@ -89,6 +91,10 @@ def main(global_config, **settings):
     config.add_route('server_owner', '/servers/{name}/owner')
     config.add_route('server_touches', '/servers/{name}/touches') 
     config.add_route('server_job_status', '/servers/{name}/job/{job}/status')  # Get server touches
+    
+    # Server configuration change calls.
+    
+    config.add_route('server_specification','servers/{name}/specification') # Get or put server specification
                  
     config.scan()
     return config.make_wsgi_app()

@@ -6,7 +6,9 @@ Home-page: UNKNOWN
 Author: UNKNOWN
 Author-email: UNKNOWN
 License: UNKNOWN
-Description: 
+Description: # eos-db
+        Database and API server for Cloudhands-EOS system.
+        
         
         v0.0.1, 2015-01-07 -- Initial release.
 Keywords: web pyramid pylons

@@ -167,6 +167,12 @@ def retrieve_server(request):
     server_details = server.return_artifact_details(server_id)
     return server_details
 
+@view_config(request_method="GET", route_name='server_by_id', renderer='json')
+def retrieve_server_by_id(request):
+    id = request.matchdict['name']
+    server_details = server.return_artifact_details(id)
+    return server_details
+
 @view_config(request_method="PATCH", route_name='server', renderer='json')
 def update_server(request):
     response = HTTPNotImplemented()
@@ -271,6 +277,23 @@ def retrieve_job_progress(request):
 def retrieve_server_touches(request):
     name = request.matchdict['name']
     return name
+
+# Server specification calls
+
+@view_config(request_method="POST", route_name='server_specification', renderer='json')
+def set_server_specification(request):
+    name = request.matchdict['name']
+    vm_id = server.get_server_id_from_name(name)
+    server.touch_to_add_specification(vm_id, request.POST['cores'], request.POST['ram'])
+    return name
+
+@view_config(request_method="GET", route_name='server_specification', renderer='json')
+def get_server_speification(request):
+    name = request.matchdict['name']
+    vm_id = server.get_server_id_from_name(name)
+    cores, ram = server.get_latest_specification(vm_id)
+    return {"cores":cores,"ram":ram}
+
 
 
 ##############################################################################
