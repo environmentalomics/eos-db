@@ -245,8 +245,20 @@ class Specification(Resource):
     
     ram = Column("ram", Integer, nullable=False)
     """The amount of RAM which we want allocated to the system."""
-
+    
     __mapper_args__ = {"polymorphic_identity": "specification"}
+
+class Deboost(Resource):
+    """
+    """
+    __tablename__ = "deboost"
+    
+    id = Column("id", Integer, ForeignKey("resource.id"),
+                nullable=False, primary_key=True)
+    
+    deboost_dt = Column(DateTime)
+    
+    __mapper_args__ = {"polymorphic_identity": "deboost"}
     
 
 class Ownership(Resource):

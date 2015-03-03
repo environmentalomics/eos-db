@@ -77,6 +77,13 @@ def main(global_config, **settings):
     config.add_route('server_start', '/servers/{name}/start')
     config.add_route('server_stop', '/servers/{name}/stop')
     
+    config.add_route('server_pre_deboost', '/servers/{name}/pre_deboost')
+    config.add_route('server_pre_deboosted', '/servers/{name}/pre_deboosted')
+    
+    config.add_route('server_deboost', '/servers/{name}/deboost')
+    config.add_route('server_deboosted', '/servers/{name}/deboosted')
+    
+    
     config.add_route('server_started', '/servers/{name}/started')
     config.add_route('server_stopped', '/servers/{name}/stopped')
     

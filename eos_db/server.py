@@ -9,7 +9,7 @@ functions which cause a number of DB changes to take effect.
 from eos_db.models import Artifact, Appliance, Registration, Membership
 from eos_db.models import Actor, Component, User, Ownership
 from eos_db.models import Touch
-from eos_db.models import State, ArtifactState
+from eos_db.models import State, ArtifactState, Deboost
 from eos_db.models import Resource, Node, Password, Credit, Specification
 from eos_db.models import Base
 
@@ -19,7 +19,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 engine = ""
 
@@ -135,6 +135,7 @@ def return_artifact_details(artifact_id):
     change_dt = _get_most_recent_change(artifact_id)
     create_dt = _get_artifact_creation_date(artifact_id)
     state = _get_most_recent_artifact_state(artifact_id)
+    boosted = _get_server_boost_status(artifact_id)
     if state == None:
         state = "Not yet initialised"
     else:
@@ -143,8 +144,18 @@ def return_artifact_details(artifact_id):
             "artifact_uuid": artifact_name,
             "change_dt": str(change_dt[0])[0:16],
             "create_dt": str(create_dt[0])[0:16],
-            "state": state
+            "state": state,
+            "boosted": boosted
             })
+    
+def set_deboost(hours, touch_id):
+    deboost_dt = datetime.now()
+    deboost_dt += timedelta(hours = hours)
+    new_deboost = Deboost(deboost_dt=deboost_dt, touch_id=touch_id)
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+    session = Session()
+    session.add(new_deboost)
+    session.commit()
     
 def list_servers_in_state(state):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
@@ -169,6 +180,43 @@ def get_server_id_from_name(name):
     artifact_id  = session.query(Artifact.id).filter(Artifact.uuid == name).first()[0]
     session.close()
     return artifact_id
+
+def get_user_id_from_name(name):
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+    session = Session()
+    user_id  = session.query(User.id).filter(User.handle == name).first()[0]
+    session.close()
+    return user_id
+
+def _get_server_boost_status(artifact_id):
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+    session = Session()
+    try:
+        cores, ram = get_latest_specification(artifact_id)
+    except:
+        cores, ram = 0, 0
+    session.close()
+    if ram >= 40:
+        return "Boosted"
+    else:
+        return "Unboosted"
+    
+def get_deboost_credits(artifact_id):
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+    session = Session()
+    hours = get_hours_until_deboost(artifact_id)
+    cores, ram = get_latest_specification(artifact_id)
+    multiplier = 0
+    if ram == 40:
+        multiplier = 1
+    if ram == 140:
+        multiplier = 3
+    if ram == 500:
+        multiplier = 12
+    return multiplier * hours
+        
+    session.close()
+    return deboost_credits
 
 def list_server_in_state(state):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
@@ -232,6 +280,16 @@ def touch_to_prepare(artifact_id):
     touch_id = _create_touch(None, artifact_id, state_id)
     return touch_id
 
+def touch_to_pre_deboost(artifact_id):
+    """Creates a touch to move the VM into the "prepare" status.
+    
+    :param artifact_id: ID of the VM we want to state-shift.
+    :returns: ID of progress reference.
+    """
+    state_id = get_state_id_by_name("Pre_Deboosting")
+    touch_id = _create_touch(None, artifact_id, state_id)
+    return touch_id
+
 def touch_to_stop(artifact_id):
     """Creates a touch to move the VM into the "pre-start" status.
     
@@ -259,6 +317,13 @@ def touch_to_prepared(vm_id):
     touch_id = _create_touch(None, vm_id, state_id)
     return touch_id
 
+def touch_to_predeboosted(vm_id):
+    """
+    """
+    state_id = get_state_id_by_name("Pre_Deboosted")
+    touch_id = _create_touch(None, vm_id, state_id)
+    return touch_id
+
 def touch_to_boost(vm_id):
     """
     
@@ -266,6 +331,13 @@ def touch_to_boost(vm_id):
     state_id = get_state_id_by_name("Boosting")
     touch_id = _create_touch(None, vm_id, state_id)
     return touch_id
+
+def touch_to_add_deboost(vm_id, hours):
+    touch_id = _create_touch(None, vm_id, None)
+    set_deboost(hours, touch_id)
+
+def check_and_remove_credits(vm_id, cpu, cores, hours):
+    pass
 
 def check_progress(job_id):
     """Looks for the most recent status value in the in-memory progress table.
@@ -289,6 +361,7 @@ def touch_to_add_credit(actor_id, credit):
     :param credit: An integer from -2147483648 to +2147483647
     :returns: ID of the new credit resource.
     """
+    
     touch_id = _create_touch(actor_id, None, None)
     success = _create_credit(touch_id, credit)
     return success
@@ -317,6 +390,23 @@ def get_latest_specification(vm_id):
         order_by(Touch.touch_dt.desc()).first()
     session.close()
     return state
+
+def get_latest_deboost_dt(vm_id):
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+    session = Session()
+    state = session.query(Deboost.deboost_dt). \
+        filter(Deboost.touch_id == Touch.id). \
+        filter(Touch.artifact_id == vm_id). \
+        filter(Touch.touch_dt != None). \
+        order_by(Touch.touch_dt.desc()).first()
+    session.close()
+    return state
+
+def get_hours_until_deboost(vm_id):
+    now = datetime.now()
+    deboost_dt = get_latest_deboost_dt(vm_id)[0]
+    d = deboost_dt-now
+    return int(d.total_seconds() / 3600)
     
 def get_previous_specification(vm_id, index):
     """

@@ -103,7 +103,7 @@ def retrieve_user_touches(request):
 
 # User credit addition, querying etc.
 
-@view_config(request_method="PUT", route_name='user_credit', renderer='json')
+@view_config(request_method="POST", route_name='user_credit', renderer='json')
 def create_user_credit(request):
     """Adds credit to a user account, negative or positive.
     
@@ -117,9 +117,10 @@ def create_user_credit(request):
         return HTTPBadRequest()
     if server.check_actor_id(actor_id) == False:
         return HTTPForbidden()
-    server.touch_to_add_credit(actor_id, credit)
+    user_id = server.get_user_id_from_name(actor_id)
+    server.touch_to_add_credit(user_id, credit)
     credits = server.check_credit(actor_id)
-    output = json.dumps({'actor_id': int(actor_id),
+    output = json.dumps({'actor_id': int(user_id),
                          'credit_change': int(credit),
                          'credit_balance': int(credits)}, sort_keys=True)
     return output
@@ -220,15 +221,33 @@ def prepare_server(request):
     newname = server.touch_to_prepare(request.POST['vm_id'])
     return newname
 
+@view_config(request_method="POST", route_name='server_pre_deboost', renderer='json')
+def pre_deboost_server(request):
+    """Put a server into the "pre-deboost" status.
+    
+    :param vm_id: ID of VApp which we want to stop.
+    :returns: JSON containing VApp ID and job ID for progress calls.
+    """   
+    newname = server.touch_to_pre_deboost(request.POST['vm_id'])
+    return newname
+
 @view_config(request_method="POST", route_name='server_boost', renderer='json')
 def boost_server(request):
     """Put a server into the "pre-boost" status.
     
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
-    """   
-    newname = server.touch_to_boost(request.POST['vm_id'])
-    return newname
+    """
+    touch_id = server.touch_to_boost(request.POST['vm_id']) # Boost Server
+    
+    # Now check if boost was successful, set deboost and remove credits accordingly.
+    if touch_id:    
+        credit_change = server.check_and_remove_credits(request.POST['vm_id'], 
+                                                        request.POST['ram'], 
+                                                        request.POST['cores'], 
+                                                        request.POST['hours'])
+        server.touch_to_add_deboost(request.POST['vm_id'], request.POST['hours'])
+    return credit_change
 
 
 @view_config(request_method="POST", route_name='server_stopped', renderer='json')
@@ -261,6 +280,16 @@ def prepared_server(request):
     newname = server.touch_to_prepared(request.POST['vm_id'])
     return newname
 
+@view_config(request_method="POST", route_name='server_pre_deboosted', renderer='json')
+def predeboosted_server(request):
+    """Put a server into the "Starting" status.
+    
+    :param vm_id: ID of VApp which we want to stop.
+    :returns: JSON containing VApp ID and job ID for progress calls.
+    """   
+    newname = server.touch_to_predeboosted(request.POST['vm_id'])
+    return newname
+
 @view_config(request_method="GET", route_name='server_job_status', renderer='json')
 def retrieve_job_progress(request):
     """Put a server into the "pre-stop" status.
@@ -288,7 +317,7 @@ def set_server_specification(request):
     return name
 
 @view_config(request_method="GET", route_name='server_specification', renderer='json')
-def get_server_speification(request):
+def get_server_specification(request):
     name = request.matchdict['name']
     vm_id = server.get_server_id_from_name(name)
     cores, ram = server.get_latest_specification(vm_id)
