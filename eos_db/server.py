@@ -136,6 +136,17 @@ def return_artifact_details(artifact_id):
     create_dt = _get_artifact_creation_date(artifact_id)
     state = _get_most_recent_artifact_state(artifact_id)
     boosted = _get_server_boost_status(artifact_id)
+    try:
+        boostremaining = get_hours_until_deboost(artifact_id)
+        if boostremaining < 0:
+            boostremaining = "N/A"
+    except:
+        boostremaining = "N/A"
+    try:
+        cores, ram = get_latest_specification(artifact_id)
+        ram = str(ram) + " GB"
+    except:
+        cores, ram = "N/A", "N/A" 
     if state == None:
         state = "Not yet initialised"
     else:
@@ -145,7 +156,10 @@ def return_artifact_details(artifact_id):
             "change_dt": str(change_dt[0])[0:16],
             "create_dt": str(create_dt[0])[0:16],
             "state": state,
-            "boosted": boosted
+            "boosted": boosted,
+            "cores": cores,
+            "ram": ram,
+            "boostremaining": boostremaining
             })
     
 def set_deboost(hours, touch_id):
