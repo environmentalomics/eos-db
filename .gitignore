@@ -1,0 +1,9 @@
+*.pyc
+*~
+*.deb
+*.gz
+id_*.pub
+*__/
+*.egg-info/
+build/
+dist/
