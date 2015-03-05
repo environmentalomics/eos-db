@@ -19,22 +19,22 @@ Base = declarative_base()
 
 class Actor(Base):
     """
-    An actor is any entity which is permitted to make an action. In the 
+    An actor is any entity which is permitted to make an action. In the
     context of this system, this could be a user or an agent.
     """
     __tablename__ = 'actor'
-    
+
     id = Column(Integer, primary_key=True)
     """ The primary key of the actor. Subclassed tables inherit this primary
     key. """
-    
+
     type = Column("type", String(length=32), nullable=False)
     """ The type of actor, eg. 'User'. Provided by subclassed tables upon entry
     creation. """
-    
+
     uuid = Column("uuid", CHAR(length=32), nullable=False, unique=True)
-    """ A uuid for the actor. """ 
-        
+    """ A uuid for the actor. """
+
     handle = Column("handle", String(length=64), nullable=True, unique=True)
     """ A handle for the actor. """
 
@@ -49,7 +49,7 @@ class Actor(Base):
 class Component(Actor):
     __tablename__ = 'component'
     id = Column(Integer, ForeignKey('actor.id'), primary_key=True)
-    
+
 class User(Actor):
     """
     A username record. Additional user details are stored as resources.
@@ -72,7 +72,7 @@ class Artifact(Base):
     Examples include a registration or an appliance.
     """
     __tablename__ = 'artifact'
-    
+
     id = Column(Integer, primary_key=True)
     uuid = Column("uuid", CHAR(length=32), nullable=False)
     type = Column("type", String(length=32), nullable=False)
@@ -81,47 +81,47 @@ class Artifact(Base):
         "polymorphic_identity": "artifact",
         "polymorphic_on": type}
 
-# The base class of Artifact is subclassed for each type of artifact which 
+# The base class of Artifact is subclassed for each type of artifact which
 # can be created at the request of a user.
 
 class Appliance(Artifact):
     __tablename__ = 'appliance'
     id = Column(Integer, ForeignKey('artifact.id'), primary_key=True)
     __mapper_args__ = {"polymorphic_identity": "appliance"}
-    
+
 
 class Registration(Artifact):
     __tablename__ = 'registration'
     id = Column(Integer, ForeignKey('artifact.id'), primary_key=True)
     __mapper_args__ = {"polymorphic_identity": "registration"}
-    
+
 class Membership(Artifact):
     __tablename__ = 'membership'
     id = Column(Integer, ForeignKey('artifact.id'), primary_key=True)
     __mapper_args__ = {"polymorphic_identity": "membership"}
-    
+
 ##############################################################################
 
 class Touch(Base):
     """
     A touch is a single alteration to the system. It is created by linking an
     artifact and an actor to a resource, and then recording a state change
-    against them. 
+    against them.
     """
     __tablename__ = 'touch'
-    
+
     id = Column(Integer, primary_key=True)
     """ Primary key. """
-    
+
     artifact_id = Column(Integer, ForeignKey('artifact.id'))
     """ Artifact associated with the touch. """
-    
+
     actor_id = Column(Integer, ForeignKey('actor.id'))
     """ The actor (eg. user) associated with the touch. """
-        
+
     state_id = Column(Integer, ForeignKey('state.id'))
     """ A state associated with the touch. What state is the artifact in? """
-    
+
     touch_dt = Column(DateTime)
     """ Instant at which the touch occurred. """
 
@@ -130,26 +130,26 @@ class Touch(Base):
 class State(Base):
     """
     The nature of Artifacts is that they take some effort to establish, and
-    they change over time. Each artifact table has its own State class so 
+    they change over time. Each artifact table has its own State class so
     that business logic can make transitions and persist state in the database.
-    """    
+    """
     __table_args__ = (UniqueConstraint("fsm", "name"),)
     __tablename__ = "state"
 
     id = Column(Integer, primary_key=True)
     fsm = Column("fsm", String(length=32), nullable=False)
     name = Column("name", String(length=64), nullable=False)
-    
+
     __mapper_args__ = {"polymorphic_identity": "state", 'polymorphic_on': fsm}
 
 class ArtifactState(State):
     __tablename__ = "artifactstate"
-    
+
     id = Column("id", Integer, ForeignKey("state.id"),
                 nullable=False, primary_key=True)
-    
+
     __mapper_args__ = {"polymorphic_identity": "artifactstate"}
-    #__table_args__ = (CheckConstraint(State.name in ['Stopped', 'Starting', 'Started', 
+    #__table_args__ = (CheckConstraint(State.name in ['Stopped', 'Starting', 'Started',
     #                                           'Boosting', 'Boosted','Deboosting',
     #                                           'Suspending', 'Suspended', 'Stopping']),)
 
@@ -171,17 +171,17 @@ class Resource(Base):
     __tablename__ = "resource"
 
     id = Column("id", Integer(), nullable=False, primary_key=True)
-    """Primary key.""" 
-    
+    """Primary key."""
+
     type = Column("type", String(length=32), nullable=False)
     """
     Indicates which sort of resource this record represents. This value is
     provided by subclassed resource tables such as "credit", "email" etc.
     """
-    
+
     touch_id = Column("touch_id", Integer, ForeignKey("touch.id"))
     """Touch associated with the resource."""
-    
+
     touch = relationship("Touch")
 
     __mapper_args__ = {
@@ -217,15 +217,15 @@ class Password(Resource):
 class Credit(Resource):
     """Represents the addition or subtraction of credit from the user's account.
     """
-    
+
     __tablename__ = "credit"
 
     id = Column("id", Integer, ForeignKey("resource.id"),
                 nullable=False, primary_key=True)
     """ Primary key. """
-    
+
     credit = Column("credit", Integer, nullable=False)
-    """The amount by which we are changing the user's account balance. 
+    """The amount by which we are changing the user's account balance.
     Negative integers represent debits from the account. The integer type used
     to define the credit runs from -2147483648 to +2147483647 when implemented
     in Postgres."""
@@ -239,39 +239,39 @@ class Specification(Resource):
 
     id = Column("id", Integer, ForeignKey("resource.id"),
                 nullable=False, primary_key=True)
-        
+
     cores = Column("cores", Integer, nullable=False)
     """The number of cores which we wish a machine to have."""
-    
+
     ram = Column("ram", Integer, nullable=False)
     """The amount of RAM which we want allocated to the system."""
-    
+
     __mapper_args__ = {"polymorphic_identity": "specification"}
 
 class Deboost(Resource):
     """
     """
     __tablename__ = "deboost"
-    
+
     id = Column("id", Integer, ForeignKey("resource.id"),
                 nullable=False, primary_key=True)
-    
+
     deboost_dt = Column(DateTime)
-    
+
     __mapper_args__ = {"polymorphic_identity": "deboost"}
-    
+
 
 class Ownership(Resource):
     """
     Represents a change in ownership of a node.
     """
     __tablename__ = "ownership"
-    
+
     id = Column("id", Integer, ForeignKey("resource.id"),
                 nullable=False, primary_key=True)
     user_id = Column("user_id", Integer, ForeignKey("user.id"),
                 nullable=False)
-    
+
     __mapper_args__ = {"polymorphic_identity": "ownership"}
-    
+
 ##############################################################################

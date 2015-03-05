@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 
 class TestUserActions(unittest.TestCase):
     """Tests actions which modify user account details"""
-    
+
     def test_newuser(self):
         """Test creation of a new user.
         """
@@ -15,9 +15,9 @@ class TestUserActions(unittest.TestCase):
         session = Session()
         session.add(new_user)
         our_user = session.query(User).filter_by(name='Ben Collier').first()
-        
+
     def tearDown(self):
         pass
-    
+
 if __name__ == '__main__':
     unittest.main()
