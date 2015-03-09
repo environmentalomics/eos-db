@@ -201,6 +201,16 @@ def start_server(request):
     newname = server.touch_to_prestart(request.POST['vm_id'])
     return newname
 
+@view_config(request_method="POST", route_name='server_restart', renderer='json')
+def restart_server(request):
+    """Put a server into the "restart" status.
+    
+    :param vm_id: ID of VApp which we want to start.
+    :returns: JSON containing VApp ID and job ID for progress calls.
+    """   
+    newname = server.touch_to_restart(request.POST['vm_id'])
+    return newname
+
 @view_config(request_method="POST", route_name='server_stop', renderer='json')
 def stop_server(request):
     """Put a server into the "pre-stop" status.

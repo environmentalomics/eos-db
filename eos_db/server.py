@@ -274,6 +274,16 @@ def touch_to_start(artifact_id):
     touch_id = _create_touch(None, artifact_id, state_id)
     return touch_id
 
+def touch_to_restart(artifact_id):
+    """Creates a touch to move the VM into the "pre-start" status.
+    
+    :param artifact_id: ID of the VM we want to state-shift.
+    :returns: ID of progress reference.
+    """
+    state_id = get_state_id_by_name("Restarting")
+    touch_id = _create_touch(None, artifact_id, state_id)
+    return touch_id
+
 def touch_to_prestart(artifact_id):
     """Creates a touch to move the VM into the "pre-start" status.
     
