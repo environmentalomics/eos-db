@@ -1,0 +1,17 @@
+*.class
+*.pyc
+*.pyo
+eos_db/settings.py
+eos_db/settings.py
+*.class
+*.pyc
+*.pyo
+*.class
+*.pyc
+*.pyo
+eos_db/settings.py
+*.class
+*.pyc
+*.pyo
+docs/_build
+py3venv
