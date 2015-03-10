@@ -10,10 +10,10 @@ from eos_db.server import check_credit, check_actor_id
 
 class TestCreditFunctions(unittest.TestCase):
     """Tests credit functions in server module."""
-    
+
     def setUp(self):
         override_engine('sqlite://')
-    
+
     def test_create_user(self):
         """
         Add a user.
@@ -21,7 +21,7 @@ class TestCreditFunctions(unittest.TestCase):
         user = create_user('user','testuser','testuser','testuser')
         exists = check_actor_id(user)
         assert exists
-    
+
     def test_add(self):
         """
         Behaviour: Calling the API to add credit should result credit being added to
@@ -31,7 +31,7 @@ class TestCreditFunctions(unittest.TestCase):
         touch_to_add_credit(user,1000)
         credit = check_credit(user)
         assert credit == 1000
-    
+
     def test_subtract(self):
         """
         Behaviour: Calling the API to add credit should result credit being
@@ -44,22 +44,22 @@ class TestCreditFunctions(unittest.TestCase):
 
 class TestCreditAPI(unittest.TestCase):
     """Tests credit API as separate process"""
-    
+
     def setUp(self):
         self.pserve = PServeThread()
-        self.pserve.start()    
-    
+        self.pserve.start()
+
     def test_create_user(self):
         assert 1 == 1
 
     def test_add_credit(self):
         assert 1 == 1
-    
+
     def test_subtract_credit(self):
         assert 1 == 1
-        
-    def tearDown(self): 
+
+    def tearDown(self):
         self.pserve.destroy()
-        
+
 if __name__ == '__main__':
     unittest.main()

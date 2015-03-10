@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 *.class
 *.pyc
 *.pyo
@@ -15,3 +16,14 @@ eos_db/settings.py
 *.pyo
 docs/_build
 py3venv
+=======
+*.pyc
+*~
+*.deb
+*.gz
+id_*.pub
+*__/
+*.egg-info/
+build/
+dist/
+>>>>>>> 7b66a2b286560de8a45672745c86ace7f4d065c3
