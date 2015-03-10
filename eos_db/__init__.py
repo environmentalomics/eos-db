@@ -78,15 +78,15 @@ def main(global_config, **settings):
     config.add_route('server_stop', '/servers/{name}/stop')
     config.add_route('server_restart', '/servers/{name}/restart')
     
-    config.add_route('server_pre_deboost', '/servers/{name}/pre_deboost')
-    config.add_route('server_pre_deboosted', '/servers/{name}/pre_deboosted')
+    config.add_route('server_pre_deboost', '/servers/{name}/pre_deboosting')
+    config.add_route('server_pre_deboosted', '/servers/{name}/Pre_deboosted')
     
-    config.add_route('server_deboost', '/servers/{name}/deboost')
-    config.add_route('server_deboosted', '/servers/{name}/deboosted')
+    config.add_route('server_deboost', '/servers/{name}/deboosting')
+    config.add_route('server_deboosted', '/servers/{name}/Deboosted')
     
     
-    config.add_route('server_started', '/servers/{name}/started')
-    config.add_route('server_stopped', '/servers/{name}/stopped')
+    config.add_route('server_started', '/servers/{name}/Started')
+    config.add_route('server_stopped', '/servers/{name}/Stopped')
     
     config.add_route('server_prepare', '/servers/{name}/prepare')
     config.add_route('server_prepared', '/servers/{name}/prepared')
