@@ -26,13 +26,16 @@ def passwordcheck(credentials, request):
     login = credentials['login']
     password = credentials['password']
     
-    login="agent"
-    password = "asdf"
+    ###################################################
+    
+    # Replace this with shared secret.
     
     USERS = {'agent':'asdf',
           'administrator':'asdf'}
     GROUPS = {'agent':['group:users'],
               'administrator':['group:administrators']}
+    
+    ###################################################
     
     if login in USERS and USERS[login] == password:
         return GROUPS.get(login, [])
