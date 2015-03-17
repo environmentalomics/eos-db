@@ -12,7 +12,7 @@ import json
 from pyramid.view import view_config
 from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented, HTTPUnauthorized, HTTPForbidden
 
-from eos_db import server
+from eos_db import server, auth
 
 ##############################################################################
 
@@ -125,7 +125,7 @@ def create_user_credit(request):
                          'credit_balance': int(credits)}, sort_keys=True)
     return output
 
-@view_config(request_method="GET", route_name='user_credit', renderer='json')
+@view_config(request_method="GET", route_name='user_credit', renderer='json', permission="use")
 def retrieve_user_credit(request):
     """Return credits outstanding for a user.
 
@@ -144,54 +144,54 @@ def retrieve_user_credit(request):
 
 # Server-related API calls - All Servers
 
-@view_config(request_method="GET", route_name='servers', renderer='json')
+@view_config(request_method="GET", route_name='servers', renderer='json', permission="use")
 def retrieve_servers(request):
     server_list = server.list_artifacts_for_user(request.GET['actor_id'])
     return server_list
 
-@view_config(request_method="GET", route_name='states', renderer='json')
+@view_config(request_method="GET", route_name='states', renderer='json', permission="use")
 def retrieve_servers_in_state(request):
     server_list = server.list_server_in_state(request.GET['state'])
     return server_list
 
 # Server-related API calls - Individual Servers
 
-@view_config(request_method="PUT", route_name='server', renderer='json')
+@view_config(request_method="PUT", route_name='server', renderer='json', permission="use")
 def create_server(request):
     newname = server.create_appliance(request.POST['hostname'])
     return newname
 
-@view_config(request_method="GET", route_name='server', renderer='json')
+@view_config(request_method="GET", route_name='server', renderer='json', permission="use")
 def retrieve_server(request):
     name = request.matchdict['name']
     server_id = server.get_server_id_from_name(name)
     server_details = server.return_artifact_details(server_id)
     return server_details
 
-@view_config(request_method="GET", route_name='server_by_id', renderer='json')
+@view_config(request_method="GET", route_name='server_by_id', renderer='json', permission="use")
 def retrieve_server_by_id(request):
     id = request.matchdict['name']
     server_details = server.return_artifact_details(id)
     return server_details
 
-@view_config(request_method="PATCH", route_name='server', renderer='json')
+@view_config(request_method="PATCH", route_name='server', renderer='json', permission="use")
 def update_server(request):
     response = HTTPNotImplemented()
     return response
 
-@view_config(request_method="DELETE", route_name='server', renderer='json')
+@view_config(request_method="DELETE", route_name='server', renderer='json', permission="use")
 def delete_server(request):
     response = HTTPNotImplemented()
     return response
 
-@view_config(request_method="PUT", route_name='server_owner', renderer='json')
+@view_config(request_method="PUT", route_name='server_owner', renderer='json', permission="use")
 def create_server_owner(request):
     newname = server.touch_to_add_ownership(request.POST['artifact_id'], request.POST['actor_id'])
     return newname
 
 # State changes
 
-@view_config(request_method="POST", route_name='server_start', renderer='json')
+@view_config(request_method="POST", route_name='server_start', renderer='json', permission="use")
 def start_server(request):
     """Put a server into the "pre-start" status.
 
@@ -201,7 +201,7 @@ def start_server(request):
     newname = server.touch_to_prestart(request.POST['vm_id'])
     return newname
 
-@view_config(request_method="POST", route_name='server_restart', renderer='json')
+@view_config(request_method="POST", route_name='server_restart', renderer='json', permission="use")
 def restart_server(request):
     """Put a server into the "restart" status.
     
@@ -211,7 +211,7 @@ def restart_server(request):
     newname = server.touch_to_restart(request.POST['vm_id'])
     return newname
 
-@view_config(request_method="POST", route_name='server_stop', renderer='json')
+@view_config(request_method="POST", route_name='server_stop', renderer='json', permission="use")
 def stop_server(request):
     """Put a server into the "pre-stop" status.
 
@@ -221,7 +221,7 @@ def stop_server(request):
     newname = server.touch_to_prestop(request.POST['vm_id'])
     return newname
 
-@view_config(request_method="POST", route_name='server_prepare', renderer='json')
+@view_config(request_method="POST", route_name='server_prepare', renderer='json', permission="use")
 def prepare_server(request):
     """Put a server into the "pre-stop" status.
 
@@ -231,7 +231,7 @@ def prepare_server(request):
     newname = server.touch_to_prepare(request.POST['vm_id'])
     return newname
 
-@view_config(request_method="POST", route_name='server_pre_deboost', renderer='json')
+@view_config(request_method="POST", route_name='server_pre_deboost', renderer='json', permission="use")
 def pre_deboost_server(request):
     """Put a server into the "pre-deboost" status.
 
@@ -241,7 +241,7 @@ def pre_deboost_server(request):
     newname = server.touch_to_pre_deboost(request.POST['vm_id'])
     return newname
 
-@view_config(request_method="POST", route_name='server_boost', renderer='json')
+@view_config(request_method="POST", route_name='server_boost', renderer='json', permission="use")
 def boost_server(request):
     """Put a server into the "pre-boost" status.
 
@@ -260,7 +260,7 @@ def boost_server(request):
     return credit_change
 
 
-@view_config(request_method="POST", route_name='server_stopped', renderer='json')
+@view_config(request_method="POST", route_name='server_stopped', renderer='json', permission="use")
 def stopped_server(request):
     """Put a server into the "Stopping" status.
 
@@ -270,7 +270,7 @@ def stopped_server(request):
     newname = server.touch_to_stop(request.POST['vm_id'])
     return newname
 
-@view_config(request_method="POST", route_name='server_started', renderer='json')
+@view_config(request_method="POST", route_name='server_started', renderer='json', permission="use")
 def started_server(request):
     """Put a server into the "Starting" status.
 
@@ -280,7 +280,7 @@ def started_server(request):
     newname = server.touch_to_start(request.POST['vm_id'])
     return newname
 
-@view_config(request_method="POST", route_name='server_prepared', renderer='json')
+@view_config(request_method="POST", route_name='server_prepared', renderer='json', permission="use")
 def prepared_server(request):
     """Put a server into the "Starting" status.
 
@@ -290,7 +290,7 @@ def prepared_server(request):
     newname = server.touch_to_prepared(request.POST['vm_id'])
     return newname
 
-@view_config(request_method="POST", route_name='server_pre_deboosted', renderer='json')
+@view_config(request_method="POST", route_name='server_pre_deboosted', renderer='json', permission="use")
 def predeboosted_server(request):
     """Put a server into the "Starting" status.
 
@@ -300,7 +300,7 @@ def predeboosted_server(request):
     newname = server.touch_to_predeboosted(request.POST['vm_id'])
     return newname
 
-@view_config(request_method="GET", route_name='server_job_status', renderer='json')
+@view_config(request_method="GET", route_name='server_job_status', renderer='json', permission="use")
 def retrieve_job_progress(request):
     """Put a server into the "pre-stop" status.
 
@@ -312,21 +312,21 @@ def retrieve_job_progress(request):
 
 # Retrieve activity log from recent touches
 
-@view_config(request_method="GET", route_name='server_touches', renderer='json')
+@view_config(request_method="GET", route_name='server_touches', renderer='json', permission="use")
 def retrieve_server_touches(request):
     name = request.matchdict['name']
     return name
 
 # Server specification calls
 
-@view_config(request_method="POST", route_name='server_specification', renderer='json')
+@view_config(request_method="POST", route_name='server_specification', renderer='json', permission="use")
 def set_server_specification(request):
     name = request.matchdict['name']
     vm_id = server.get_server_id_from_name(name)
     server.touch_to_add_specification(vm_id, request.POST['cores'], request.POST['ram'])
     return name
 
-@view_config(request_method="GET", route_name='server_specification', renderer='json')
+@view_config(request_method="GET", route_name='server_specification', renderer='json', permission="use")
 def get_server_specification(request):
     name = request.matchdict['name']
     vm_id = server.get_server_id_from_name(name)

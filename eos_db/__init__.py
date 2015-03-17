@@ -4,6 +4,8 @@ import logging
 import os
 import eos_db.server
 
+from eos_db.auth import BasicAuthenticationPolicy
+
 ALLOWED_ORIGIN = ('http://localhost:6542', )
 
 def add_cors_headers_response_callback(event):
@@ -20,9 +22,31 @@ def add_cors_headers_response_callback(event):
 
     event.request.add_response_callback(cors_headers)
 
+def passwordcheck(credentials, request):
+    login = credentials['login']
+    password = credentials['password']
+    
+    login="agent"
+    password = "asdf"
+    
+    USERS = {'agent':'asdf',
+          'administrator':'asdf'}
+    GROUPS = {'agent':['group:users'],
+              'administrator':['group:administrators']}
+    
+    if login in USERS and USERS[login] == password:
+        return GROUPS.get(login, [])
+    else:
+        return None
+    
 def main(global_config, **settings):
-    config = Configurator(settings=settings)
+    
+    config = Configurator(settings=settings, 
+                          authentication_policy=BasicAuthenticationPolicy(passwordcheck),
+                          root_factory='eos_db.models.RootFactory')
+    
     config.add_subscriber(add_cors_headers_response_callback, NewRequest)
+
 
     settings = config.registry.settings
     server.choose_engine(settings['server'])

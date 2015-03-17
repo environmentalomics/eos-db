@@ -17,6 +17,14 @@ from eos_db.settings import DBDetails as DB
 
 Base = declarative_base()
 
+from pyramid.security import Allow
+
+class RootFactory(object):
+    __acl__ = [ (Allow, 'group:users', 'use'),
+                (Allow, 'group:adminstrators', 'administrate') ]
+    def __init__(self, request):
+        pass
+
 class Actor(Base):
     """
     An actor is any entity which is permitted to make an action. In the
