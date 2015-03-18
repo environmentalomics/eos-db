@@ -20,39 +20,72 @@ from eos_db import server, auth
 
 @view_config(request_method="GET", route_name='home', renderer='json')
 def home_view(request):
-    return None
+    call_list = {"Valid API Call List":{
+                              "Setup States": "/setup_states",
+                              "Sessions": "/sessions",
+                              "session": "/session", # Get session details or
+                              "users": "/users", # Return user list
+                              "user": "/users/{name}",   # Get user details or
+                              "user_touches": "/users/{name}/touches",
+                              "user_password": "/users/{name}/password",                    
+                              "user_credit": "/users/{name}/credit",
+                              "servers": "/servers", # Return server list
+                              "server": "/servers/{name}",    # Get server details or
+                              "server_by_id": "/servers/by_id/{name}",
+                              "states": "/states/{name}", # Get list of servers in given state.
+                              "server_start": "/servers/{name}/start",
+                              "server_stop": "/servers/{name}/stop",
+                              "server_restart": "/servers/{name}/restart",
+                              "server_pre_deboost": "/servers/{name}/pre_deboosting",
+                              "server_pre_deboosted": "/servers/{name}/Pre_deboosted",
+                              "server_deboost": "/servers/{name}/deboosting",
+                              "server_deboosted": "/servers/{name}/Deboosted",
+                              "server_started": "/servers/{name}/Started",
+                              "server_stopped": "/servers/{name}/Stopped",
+                              "server_prepare": "/servers/{name}/prepare",
+                              "server_prepared": "/servers/{name}/prepared",
+                              "server_boost": "/servers/{name}/boost",
+                              "server_boosted": "/servers/{name}/boosted",
+                              "server_suspend": "/servers/{name}/suspend",
+                              "server_owner": "/servers/{name}/owner",
+                              "server_touches": "/servers/{name}/touches",
+                              "server_job_status": "/servers/{name}/job/{job}/status",
+                              "server_specification": "/servers/{name}/specification"
+                              }
+                 }
+    return call_list
 
 # OPTIONS call result
 
-@view_config(request_method="OPTIONS", route_name='server_start', renderer='json')
-@view_config(request_method="OPTIONS", route_name='server_stop', renderer='json')
+@view_config(request_method="OPTIONS", route_name='server_start', renderer='json', permission="use")
+@view_config(request_method="OPTIONS", route_name='server_stop', renderer='json', permission="use")
 def options(request):
     return "None"
 
 # Views for setting up test databases
 
-@view_config(request_method="POST", route_name='setup_states', renderer='json')
+@view_config(request_method="POST", route_name='setup_states', renderer='json', permission="use")
 def setup_states(request):
     return None
 
-@view_config(request_method="POST", route_name='setup', renderer='json')
+@view_config(request_method="POST", route_name='setup', renderer='json', permission="use")
 def setup(request):
     return None
 
 # User-related API calls - All users
 
-@view_config(request_method="GET", route_name='users', renderer='json')
+@view_config(request_method="GET", route_name='users', renderer='json', permission="use")
 def retrieve_users(request):
     return name
 
 # User-related API calls - Individual users
 
-@view_config(request_method="PUT", route_name='user', renderer='json')
+@view_config(request_method="PUT", route_name='user', renderer='json', permission="use")
 def create_user(request):
     newname = server.create_user(request.POST['type'],request.POST['handle'],request.POST['name'],request.POST['username'])
     return newname
 
-@view_config(request_method="GET", route_name='user', renderer='json')
+@view_config(request_method="GET", route_name='user', renderer='json', permission="use")
 def retrieve_user(request):
     """Return account details for a user.
     :param actor_id: The user we are interested in.
@@ -65,25 +98,25 @@ def retrieve_user(request):
     details['credits'] = server.check_credit(actor_id)
     return json.dumps(details)
 
-@view_config(request_method="PATCH", route_name='user', renderer='json')
+@view_config(request_method="PATCH", route_name='user', renderer='json', permission="use")
 def update_user(request):
     response = HTTPNotImplemented()
     return response
 
-@view_config(request_method="DELETE", route_name='user', renderer='json')
+@view_config(request_method="DELETE", route_name='user', renderer='json', permission="use")
 def delete_user(request):
     response = HTTPNotImplemented()
     return response
 
 # User password actions
 
-@view_config(request_method="PUT", route_name='user_password', renderer='json')
+@view_config(request_method="PUT", route_name='user_password', renderer='json', permission="use")
 def create_user_password(request):
     # Add salt and hash
     newname = server.touch_to_add_password(request.POST['actor_id'],request.POST['password'])
     return newname
 
-@view_config(request_method="GET", route_name='user_password', renderer='json')
+@view_config(request_method="GET", route_name='user_password', renderer='json', permission="use")
 def retrieve_user_password(request):
     # Add salt and hash
     verify = server.check_password(request.GET['actor_id'],request.GET['password'])
@@ -96,14 +129,14 @@ def retrieve_user_password(request):
 
 # Retrieve activity log from recent touches
 
-@view_config(request_method="GET", route_name='user_touches', renderer='json')
+@view_config(request_method="GET", route_name='user_touches', renderer='json', permission="use")
 def retrieve_user_touches(request):
     name = request.matchdict['name']
     return name
 
 # User credit addition, querying etc.
 
-@view_config(request_method="POST", route_name='user_credit', renderer='json')
+@view_config(request_method="POST", route_name='user_credit', renderer='json', permission="use")
 def create_user_credit(request):
     """Adds credit to a user account, negative or positive.
 
