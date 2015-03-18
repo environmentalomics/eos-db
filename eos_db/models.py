@@ -21,6 +21,10 @@ from pyramid.security import Allow
 
 class RootFactory(object):
     __acl__ = [ (Allow, 'group:users', 'use'),
+                (Allow, 'group:agents', 'use'),
+                (Allow, 'group:agents', 'act'),
+                (Allow, 'group:adminstrators', 'use'),
+                (Allow, 'group:adminstrators', 'act'),
                 (Allow, 'group:adminstrators', 'administrate') ]
     def __init__(self, request):
         pass
