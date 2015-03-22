@@ -1,0 +1,52 @@
+#!python
+
+from __future__ import absolute_import, division, print_function
+import sys, traceback
+
+# Import EOS server access library.
+
+try:
+    from eos_db import server
+except ImportError:
+    traceback.print_exc(file=sys.stdout)
+    print ("Please ensure that you have run setup.py in the EOS DB package prior to running this script.")
+    sys.exit()
+
+# Switch to Postgres access mode (test uses SQLite)
+
+try:
+    server.choose_engine("PostgreSQL")
+except:
+    traceback.print_exc(file=sys.stdout)
+    print ("Init-EOS failed to switch to Postgres access mode. Your installation is probably corrupt. Please reinstall and try again.")
+    sys.exit()
+
+# Create database.
+
+try:
+    server.deploy_tables()
+except:
+    traceback.print_exc(file=sys.stdout)
+    print ("Init-EOS failed to deploy tables to Postgres. Please ensure that you have set up a Postgres instance with the correct access permissions.")
+    sys.exit()
+
+# Create entries for permissible states in state machine
+
+try:
+    server.setup_states(['Starting',
+                         'Started',
+                         'Stopping',
+                         'Stopped',
+                         'Pre_Deboosting',
+                         'Pre_Deboosted',
+                         'Preparing',
+                         'Prepared',
+                         'Boosting',
+                         'Boosted',
+                         'Restarting'])
+except:
+    traceback.print_exc(file=sys.stdout)
+    print ("Init-EOS failed to deploy data to Postgres. Please ensure that you have set up a Postgres instance with the correct access permissions.")
+    sys.exit()
+    
+print ("EOS was successfully initialised.")

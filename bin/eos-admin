@@ -1,0 +1,57 @@
+#!python
+
+"""EOS Admin - Administrator Actions for EOS Cloud
+
+Permissible instructions:
+
+adduser <username> <password> - Add a user with the specified password.
+addcredit <username> <credit> - Add credit to a user. Negative amounts deduct credit.
+changepwd <username> <password> - Change a user's password.
+
+"""
+
+from __future__ import absolute_import, division, print_function
+import sys
+from eos_db import server
+
+arg = sys.argv
+
+if arg[1] == 'adduser':
+    print ("Adding user...")
+    
+    try:
+        username = arg[2]
+        password = arg[3]
+    except IndexError:
+        print ("Please ensure you enter a username and password.")
+        sys.exit()
+    
+    server.choose_engine("PostgreSQL")
+    id = server.create_user("user", username, username, username)   
+    print ("New user created with id %s" % id)
+    server.touch_to_add_password(id, password)
+    
+if arg[1] == 'addcredit': #TODO
+    if arg[2]:
+        username = arg[2]
+    else:
+        print ("No username specified.")
+        sys.exit()
+    if arg[3]:
+        password = arg[3]
+    else:
+        print ("No credit amount specified.")
+        sys.exit()
+    
+if arg[1] == 'changepwd': #TODO
+    if arg[2]:
+        username = arg[2]
+    else:
+        print ("No username specified.")
+        sys.exit()
+    if arg[3]:
+        password = arg[3]
+    else:
+        print ("No password specified.")
+        sys.exit()
+    

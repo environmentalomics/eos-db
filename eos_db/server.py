@@ -79,7 +79,6 @@ def create_user(type, handle, name, username):
     session = Session()
     session.add(new_user)
     session.commit()
-
     session.close()
     return new_user.id
 

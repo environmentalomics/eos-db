@@ -36,6 +36,7 @@ if __name__ == "__main__":
             "Topic :: Internet :: WWW/HTTP",
             "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
             ],
+          scripts=['bin/eos-init', 'bin/eos-admin', 'bin/eos-db'],
           author='',
           author_email='',
           url='',

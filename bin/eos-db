@@ -1,0 +1,16 @@
+#!python
+
+"""EOS DB - Service Actions
+
+Permissible instructions:
+
+start
+stop
+restart
+
+"""
+
+import sys
+
+for arg in sys.argv:
+    print arg
