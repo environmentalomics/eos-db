@@ -4,7 +4,7 @@ Database and API server for Cloudhands-EOS system.
 # Quickstart for Ubuntu 14.04
 
 
- $ apt-get install postgresql libpq-dev
+ $ apt-get install python-dev postgresql libpq-dev
 
  $ virtualenv ~/eoscloud/py2venv
  $ wget -q -O- https://bootstrap.pypa.io/get-pip.py | ~/eoscloud-venv/py2venv/bin/python
