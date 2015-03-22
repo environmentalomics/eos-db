@@ -4,10 +4,17 @@
 
 Permissible instructions:
 
-adduser <username> <password> - Add a user with the specified password.
-addvm <username> <server_name> <server_uuid> - Add a particular server to a user's account.
-addcredit <username> <credit> - Add credit to a user. Negative amounts deduct credit.
-changepwd <username> <password> - Change a user's password.
+eos-admin adduser <username> <password> :
+    Add a user with the specified password.
+
+eos-admin addvm <username> <server_name> <server_uuid> :
+    Add a particular server to a user's account.
+
+eos-admin addcredit <username> <credit> :
+    Add credit to a user. Negative amounts deduct credit.
+
+eos-admin changepwd <username> <password> :
+    Change a user's password.
 
 """
 
@@ -16,6 +23,24 @@ import sys
 from eos_db import server
 
 arg = sys.argv
+
+if arg[1] == 'help':
+    print ("""EOS Admin - Administrator Actions for EOS Cloud
+    -----------------------------------------------
+    
+    Permissible instructions:
+    
+    eos-admin adduser <username> <password>
+        Add a user with the specified password.
+    
+    eos-admin addvm <username> <server_name> <server_uuid>
+        Add a particular server to a user's account.
+    
+    eos-admin addcredit <username> <credit>
+        Add credit to a user. Negative amounts deduct credit.
+
+    eos-admin changepwd <username> <password>
+        Change a user's password.""")
 
 if arg[1] == 'adduser':
     print ("Adding user...")
