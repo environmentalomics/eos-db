@@ -82,17 +82,16 @@ def create_user(type, handle, name, username):
     session.close()
     return new_user.id
 
-def create_appliance(uuid):
+def create_appliance(name, uuid):
     """
 
     """
     Base.metadata.create_all(engine)
-    new_appliance = Appliance(uuid=uuid)
+    new_appliance = Appliance(uuid=uuid, name=name)
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     session.add(new_appliance)
     session.commit()
-
     session.close()
     return new_appliance.id
 
@@ -262,6 +261,8 @@ def get_state_id_by_name(name):
         first()[0]
     session.close()
     return state_id
+
+
 
 def touch_to_start(artifact_id):
     """Creates a touch to move the VM into the "pre-start" status.

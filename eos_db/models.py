@@ -87,6 +87,7 @@ class Artifact(Base):
 
     id = Column(Integer, primary_key=True)
     uuid = Column("uuid", CHAR(length=32), nullable=False)
+    name = Column("name", CHAR(length=32), nullable=False)
     type = Column("type", String(length=32), nullable=False)
 
     __mapper_args__ = {

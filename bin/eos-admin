@@ -5,6 +5,7 @@
 Permissible instructions:
 
 adduser <username> <password> - Add a user with the specified password.
+addvm <username> <server_name> <server_uuid> - Add a particular server to a user's account.
 addcredit <username> <credit> - Add credit to a user. Negative amounts deduct credit.
 changepwd <username> <password> - Change a user's password.
 
@@ -31,6 +32,24 @@ if arg[1] == 'adduser':
     print ("New user created with id %s" % id)
     server.touch_to_add_password(id, password)
     
+if arg[1] == 'addvm':
+    print ("Adding vm...")
+    
+    try:
+        username = arg[2]
+        machine_name = arg[3]
+        machine_uuid = arg[4]
+    except IndexError:
+        print ("Please ensure you enter a username, machine name, and UUID.")
+        sys.exit()
+    
+    server.choose_engine("PostgreSQL")
+    id = server.create_appliance(machine_name, machine_uuid)
+    user_id = server.get_user_id_from_name(username)
+    id = server.touch_to_add_ownership(id, user_id)
+    print ("New server created with id %s" % id)
+    print ("New server ownership added to user id %s" % user_id)
+
 if arg[1] == 'addcredit': #TODO
     if arg[2]:
         username = arg[2]
