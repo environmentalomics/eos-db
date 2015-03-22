@@ -24,24 +24,6 @@ from eos_db import server
 
 arg = sys.argv
 
-if arg[1] == 'help':
-    print ("""EOS Admin - Administrator Actions for EOS Cloud
-    -----------------------------------------------
-    
-    Permissible instructions:
-    
-    eos-admin adduser <username> <password>
-        Add a user with the specified password.
-    
-    eos-admin addvm <username> <server_name> <server_uuid>
-        Add a particular server to a user's account.
-    
-    eos-admin addcredit <username> <credit>
-        Add credit to a user. Negative amounts deduct credit.
-
-    eos-admin changepwd <username> <password>
-        Change a user's password.""")
-
 if arg[1] == 'adduser':
     print ("Adding user...")
     
@@ -57,7 +39,7 @@ if arg[1] == 'adduser':
     print ("New user created with id %s" % id)
     server.touch_to_add_password(id, password)
     
-if arg[1] == 'addvm':
+elif arg[1] == 'addvm':
     print ("Adding vm...")
     
     try:
@@ -75,7 +57,7 @@ if arg[1] == 'addvm':
     print ("New server created with id %s" % id)
     print ("New server ownership added to user id %s" % user_id)
 
-if arg[1] == 'addcredit': #TODO
+elif arg[1] == 'addcredit': #TODO
     if arg[2]:
         username = arg[2]
     else:
@@ -87,7 +69,7 @@ if arg[1] == 'addcredit': #TODO
         print ("No credit amount specified.")
         sys.exit()
     
-if arg[1] == 'changepwd': #TODO
+elif arg[1] == 'changepwd': #TODO
     if arg[2]:
         username = arg[2]
     else:
@@ -98,4 +80,26 @@ if arg[1] == 'changepwd': #TODO
     else:
         print ("No password specified.")
         sys.exit()
+
+else:
+    print ("""
+EOS Admin - Administrator Actions for EOS Cloud
+-----------------------------------------------
+    
+    Permissible instructions:
+    
+    eos-admin help
+        Display this help.
+    
+    eos-admin adduser <username> <password>
+        Add a user with the specified password.
+    
+    eos-admin addvm <username> <server_name> <server_uuid>
+        Add a particular server to a user's account.
+    
+    eos-admin addcredit <username> <credit>
+        Add credit to a user. Negative amounts deduct credit.
+
+    eos-admin changepwd <username> <password>
+        Change a user's password.""")
     
