@@ -15,10 +15,15 @@ if __name__ == "__main__":
         VERSION = f.read().split()[0]
 
     requires = [
-        'pyramid',
-        'pyramid_chameleon',
-        'pyramid_debugtoolbar',
-        'waitress',
+        'pyramid',              # Framework
+        'pyramid_debugtoolbar', # Framework debugger
+        'pyramid_chameleon',    # Templating framework
+        'waitress',             # Server
+        'sqlalchemy',           # ORM
+        'psycopg2',             # Postgres database interface
+        'paste',                # HTTP header handling for security
+        'requests',             # Required for tests
+        'webtest'               # Required for tests
         ]
 
     setup(name='eos_db',
