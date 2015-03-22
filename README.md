@@ -14,6 +14,8 @@ Database and API server for Cloudhands-EOS system.
 
  $ ~/eoscloud-venv/bin/python setup.py develop
 
+Now use the eos-admin tool to configure your users and servers, before starting the DB:
+
  $ ~/eoscloud-venv/bin/pserve development.ini
  
 # Notes
