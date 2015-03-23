@@ -283,7 +283,19 @@ def create_session_key(touch_id, session_key):
 
 def check_token(token, artifact_id):
     """Check if artifact belongs to owner of token"""
-     
+    token_actor_id = get_token_owner(token)
+    return check_ownership(artifact_id, token_actor_id)
+
+def check_ownership(artifact_id, actor_id):
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+    session = Session()
+    our_ownership = session.query(Ownership).filter(Ownership.touch_id==Touch.id).filter(Touch.actor_id==Actor.id).filter(Actor.handle==actor_id).order_by(Touch.id.desc()).first()
+    session.close()
+    if our_ownership is None:
+        return False
+    else:
+        return True
+
 
 def get_state_id_by_name(name):
     """Gets the id of a state from the name associated with it.
