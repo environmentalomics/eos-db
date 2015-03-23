@@ -76,6 +76,7 @@ def setup(request):
 
 @view_config(request_method="GET", route_name='users', renderer='json', permission="use")
 def retrieve_users(request):
+    ## FIXME
     return name
 
 # User-related API calls - Individual users

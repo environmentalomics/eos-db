@@ -1,8 +1,5 @@
 import binascii
 
-from paste.httpheaders import AUTHORIZATION
-from paste.httpheaders import WWW_AUTHENTICATE
-
 from pyramid.interfaces import IAuthenticationPolicy
 from pyramid.security import Everyone
 from pyramid.security import Authenticated
@@ -12,7 +9,8 @@ from pyramid.httpexceptions import HTTPUnauthorized
 from zope.interface import implements
 
 def _get_basicauth_credentials(request):
-    authorization = AUTHORIZATION(request.environ)
+    authorization = request.headers.get('Authorization', '')
+
     try:
         authmeth, auth = authorization.split(' ', 1)
     except ValueError:  # not enough values to unpack
@@ -73,9 +71,8 @@ class BasicAuthenticationPolicy(object):
     def remember(self, request, principal, **kw):
         return []
 
-#     def forget(self, request):
-#         head = WWW_AUTHENTICATE.tuples('Basic realm="%s"' % self.realm)
-#         return head
+    def forget(self, request):
+        return self.forbidden_view(request, None)
 
     #Ensure that unauthenticated users get told to log in.
     #Not sure where this really belongs.

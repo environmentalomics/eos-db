@@ -13,8 +13,9 @@ class TestVMAPI(unittest.TestCase):
     """
     def setUp(self):
         """Launch pserve using webtest with test settings"""
-        self.myapp = get_app('../../test.ini')
-        app = TestApp(self.myapp)
+        self.appconf = get_app('../../test.ini')
+        self.myapp = TestApp(self.appconf)
+        app = self.myapp
 
         # At this point I need to authenticate as administrator:asdf,
         # but really I should be able to supply a username and password in
@@ -28,13 +29,13 @@ class TestVMAPI(unittest.TestCase):
     def test_environment(self):
         """Does the home page of the API return 200 OK on get?
         """
-        app = TestApp(self.myapp)
+        app = self.myapp
         response = app.get('/', status=200)
 
     def test_list_users(self):
         """As an admin I should be able to list the users
         """
-        app = TestApp(self.myapp)
+        app = self.myapp
 
         response = app.get('/users', status=200)
 
@@ -43,7 +44,8 @@ class TestVMAPI(unittest.TestCase):
     def test_start_server(self):
         """Tests the results of calling API to start a server.
         """
-        app = TestApp(self.myapp)
+        app = self.myapp
+
         response = app.post_json('/servers/register',
                                  dict(id=1, value='value'))
         response = app.post_json('/servers/asdf/start',
@@ -54,7 +56,8 @@ class TestVMAPI(unittest.TestCase):
     def test_stop_server(self):
         """Tests the results of calling API to stop a server.
         """
-        app = TestApp(self.myapp)
+        app = self.myapp
+
         response = app.post('/servers/register')
         response = app.post('/servers/asdfasdf/start')
         response = app.get('/servers/asdasd/state')
