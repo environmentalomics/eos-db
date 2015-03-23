@@ -25,7 +25,8 @@ from eos_db import server
 arg = sys.argv
 
 if len(arg) == 0:
-    print 'Please type "eos-admin help" for more info.'
+    print ('No arguments provided. Please type "eos-admin help" for more info.')
+    sys.exit()
 
 if arg[1] == 'adduser':
     print ("Adding user...")
