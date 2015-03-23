@@ -238,8 +238,8 @@ class Password(Resource):
 
     def check(self, candidate):
         """Checks if a candidate password matches the stored crypt-ed password.
+           Caller should use this rather than attempting manual comparison.
         """
-        print("xxx" + str(self.password))
         return str(self.password) == hashpw(str(candidate), str(self.password))
 
 class Credit(Resource):
