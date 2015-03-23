@@ -11,7 +11,7 @@ import json
 
 from pyramid.view import view_config
 from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented, HTTPUnauthorized, HTTPForbidden
-
+import hashlib, base64, random
 from eos_db import server, auth
 
 ##############################################################################
@@ -57,8 +57,8 @@ def home_view(request):
 
 # OPTIONS call result
 
-@view_config(request_method="OPTIONS", route_name='server_start', renderer='json', permission="use")
-@view_config(request_method="OPTIONS", route_name='server_stop', renderer='json', permission="use")
+@view_config(request_method="OPTIONS", route_name='server_start', renderer='json', permission="token")
+@view_config(request_method="OPTIONS", route_name='server_stop', renderer='json', permission="token")
 def options(request):
     return "None"
 
@@ -121,7 +121,9 @@ def retrieve_user_password(request):
     # Add salt and hash
     verify = server.check_password(request.GET['actor_id'],request.GET['password'])
     if verify == True:
-        return 'a8a89098a0e9'
+        key = base64.b64encode(hashlib.sha256( str(random.getrandbits(256)) ).digest(), random.choice(['rA','aZ','gQ','hH','hG','aR','DD'])).rstrip('==')
+        server.touch_to_add_session_key(request.GET['actor_id'], key)
+        return key
     else:
         response = HTTPUnauthorized()
         return response
@@ -184,8 +186,9 @@ def retrieve_servers(request):
 
 @view_config(request_method="GET", route_name='states', renderer='json', permission="use")
 def retrieve_servers_in_state(request):
-    server_list = server.list_server_in_state(request.GET['state'])
-    return server_list
+    server_id = server.list_server_in_state(request.GET['state'])
+    server_uuid = server.get_server_uuid_by_id(server_id)
+    return {"artifact_id": server_id, "artifact_uuid":server_uuid}
 
 # Server-related API calls - Individual Servers
 
@@ -224,17 +227,21 @@ def create_server_owner(request):
 
 # State changes
 
-@view_config(request_method="POST", route_name='server_start', renderer='json', permission="use")
+@view_config(request_method="POST", route_name='server_start', renderer='json', permission="token")
 def start_server(request):
     """Put a server into the "pre-start" status.
 
     :param vm_id: ID of VApp which we want to start.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_prestart(request.POST['vm_id'])
-    return newname
+    token = server.touch_to_prestart(request.POST['eos-token'])
+    if server.check_token(token, vm_id):
+        newname = server.touch_to_prestart(request.POST['vm_id'])
+        return newname
+    else:
+        return HTTPUnauthorized
 
-@view_config(request_method="POST", route_name='server_restart', renderer='json', permission="use")
+@view_config(request_method="POST", route_name='server_restart', renderer='json', permission="token")
 def restart_server(request):
     """Put a server into the "restart" status.
     

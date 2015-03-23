@@ -9,7 +9,7 @@ functions which cause a number of DB changes to take effect.
 from eos_db.models import Artifact, Appliance, Registration, Membership
 from eos_db.models import Actor, Component, User, Ownership
 from eos_db.models import Touch
-from eos_db.models import State, ArtifactState, Deboost
+from eos_db.models import State, ArtifactState, Deboost, SessionKey
 from eos_db.models import Resource, Node, Password, Credit, Specification
 from eos_db.models import Base
 
@@ -238,7 +238,7 @@ def list_server_in_state(state):
     for server in servers:
         if _get_most_recent_artifact_state(server[0])[0] == state:
             stated_server = server[0]
-    session.close()
+    session.close() 
     return stated_server
 
 def touch_to_add_ownership(artifact_id, user_id):
@@ -247,6 +247,32 @@ def touch_to_add_ownership(artifact_id, user_id):
     return ownership_id
 
 ##############################################################################
+
+def get_server_uuid_by_id(id):
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+    session = Session()
+    server = session.query(Artifact.uuid).filter(id == id).first()
+    return server
+
+##############################################################################
+
+def touch_to_add_session_key(userid, session_key):
+    touch_id=_create_touch(get_user_id_from_name(userid), None, None)
+    session_id=create_session_key(touch_id, session_key)
+    return session_id
+
+def create_session_key(touch_id, session_key):
+    new_session_key = SessionKey(touch_id=touch_id, session_key=session_key)
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+    session = Session()
+    session.add(new_session_key)
+    session.commit()
+    session.close()
+    return new_session_key.id
+
+def check_token(token, artifact_id):
+    """Check if artifact belongs to owner of token"""
+     
 
 def get_state_id_by_name(name):
     """Gets the id of a state from the name associated with it.

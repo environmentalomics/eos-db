@@ -17,10 +17,11 @@ from eos_db.settings import DBDetails as DB
 
 Base = declarative_base()
 
-from pyramid.security import Allow
+from pyramid.security import Allow, Everyone
 
 class RootFactory(object):
-    __acl__ = [ (Allow, 'group:users', 'use'),
+    __acl__ = [ (Allow, Everyone, 'token'),
+                (Allow, 'group:users', 'use'),
                 (Allow, 'group:agents', 'use'),
                 (Allow, 'group:agents', 'act'),
                 (Allow, 'group:adminstrators', 'use'),
@@ -244,6 +245,20 @@ class Credit(Resource):
     in Postgres."""
 
     __mapper_args__ = {"polymorphic_identity": "credit"}
+
+class SessionKey(Resource):
+    """Represents the addition or subtraction of credit from the user's account.
+    """
+
+    __tablename__ = "sessionkey"
+
+    id = Column("id", Integer, ForeignKey("resource.id"),
+                nullable=False, primary_key=True)
+    """ Primary key. """
+
+    session_key = Column("session_key", String(length=64), nullable=False)
+    
+    __mapper_args__ = {"polymorphic_identity": "sessionkey"}
 
 class Specification(Resource):
     """Represents a given set of configuration options for an artifact.
