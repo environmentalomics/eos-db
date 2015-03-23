@@ -13,11 +13,12 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, DateTime, CHAR, ForeignKey
 from sqlalchemy import UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
-from eos_db.settings import DBDetails as DB
 
 Base = declarative_base()
 
 from pyramid.security import Allow, Everyone
+
+from bcrypt import hashpw, gensalt
 
 class RootFactory(object):
     __acl__ = [ (Allow, Everyone, 'token'),
@@ -218,7 +219,9 @@ class Node(Resource):
 
 class Password(Resource):
     """
-    Represents a password.
+    Represents a password, which will be bcrypt'ed for you.
+    Do not attempt to set the password after creating the object - regard
+    it as immutable.
     """
     __tablename__ = "password"
 
@@ -227,6 +230,17 @@ class Password(Resource):
     password = Column("password", String(length=64), nullable=False)
 
     __mapper_args__ = {"polymorphic_identity": "password"}
+
+    def __init__(self, **kwargs):
+        #Crypt it
+        kwargs['password'] = hashpw(str(kwargs['password']), gensalt())
+        super(self.__class__,self).__init__(**kwargs)
+
+    def check(self, candidate):
+        """Checks if a candidate password matches the stored crypt-ed password.
+        """
+        print("xxx" + str(self.password))
+        return str(self.password) == hashpw(str(candidate), str(self.password))
 
 class Credit(Resource):
     """Represents the addition or subtraction of credit from the user's account.

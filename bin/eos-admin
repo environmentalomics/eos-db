@@ -22,88 +22,113 @@ from __future__ import absolute_import, division, print_function
 import sys
 from eos_db import server
 
-arg = sys.argv
+arg = sys.argv[1:]
 
 if len(arg) == 0:
-    print ('No arguments provided. Please type "eos-admin help" for more info.')
+    print ('No arguments provided. Type "eos-admin help" for more info.')
     sys.exit()
 
-if arg[1] == 'adduser':
+# This only works with PostgreSQL??
+server.choose_engine("PostgreSQL")
+
+if arg[0] == 'adduser':
     print ("Adding user...")
-    
+
     try:
-        username = arg[2]
-        password = arg[3]
+        username = arg[1]
+        password = arg[2]
+        realname = arg[3] if len(arg) >= 4 else username
     except IndexError:
-        print ("Please ensure you enter a username and password.")
+        print ("Ensure you enter a username and password.")
         sys.exit()
-    
-    server.choose_engine("PostgreSQL")
-    id = server.create_user("user", username, username, username)   
+
+    id = server.create_user("user", username, realname, username)
     print ("New user created with id %s" % id)
     server.touch_to_add_password(id, password)
-    
-elif arg[1] == 'addvm':
+
+elif arg[0] == 'addvm':
     print ("Adding vm...")
-    
+
     try:
-        username = arg[2]
-        machine_name = arg[3]
-        machine_uuid = arg[4]
+        username = arg[1]
+        machine_name = arg[2]
+        machine_uuid = arg[3]
     except IndexError:
-        print ("Please ensure you enter a username, machine name, and UUID.")
+        print ("Ensure you enter a username, machine name, and UUID.")
         sys.exit()
-    
-    server.choose_engine("PostgreSQL")
+
     id = server.create_appliance(machine_name, machine_uuid)
-    user_id = server.get_user_id_from_name(username)
+    try:
+        user_id = server.get_user_id_from_name(username)
+    except TypeError:
+        print("No such user.")
+        sys.exit()
     id = server.touch_to_add_ownership(id, user_id)
     print ("New server created with id %s" % id)
     print ("New server ownership added to user id %s" % user_id)
 
-elif arg[1] == 'addcredit': #TODO
-    if arg[2]:
-        username = arg[2]
-    else:
-        print ("No username specified.")
+elif arg[0] == 'addcredit':
+    print ("Adding credit...")
+
+    try:
+        username = arg[1]
+        credit = int(arg[2])
+    except IndexError, ValueError:
+        print ("Specify a user name and integer credit amount.")
         sys.exit()
-    if arg[3]:
-        password = arg[3]
-    else:
-        print ("No credit amount specified.")
+
+    try:
+        user_id = server.get_user_id_from_name(username)
+    except TypeError:
+        print("No such user.")
         sys.exit()
-    
-elif arg[1] == 'changepwd': #TODO
-    if arg[2]:
-        username = arg[2]
-    else:
-        print ("No username specified.")
+    server.touch_to_add_credit(user_id, credit)
+
+    #For some reason this call needs the username, not the ID.
+    credits_now = server.check_credit(username)
+    print("User %s now has %i credits." % (username, credits_now))
+
+elif arg[0] == 'changepwd':
+    print ("Changing password...")
+
+    try:
+        username = arg[1]
+        password = arg[2]
+    except IndexError:
+        print ("No username or password specified.")
         sys.exit()
-    if arg[3]:
-        password = arg[3]
-    else:
-        print ("No password specified.")
+
+    try:
+        user_id = server.get_user_id_from_name(username)
+    except TypeError:
+        print("No such user.")
         sys.exit()
+    pwd = server.touch_to_add_password(user_id, password)
+
+    #Sanity check...
+    if server.check_password(username, password):
+        print("User %s password set." % (username))
+    else:
+        print("Failed to set the password!")
 
 else:
     print ("""
 EOS Admin - Administrator Actions for EOS Cloud
 -----------------------------------------------
-    
+
     Permissible instructions:
-    
+
     eos-admin help
         Display this help.
-    
+
     eos-admin adduser <username> <password>
         Add a user with the specified password.
-    
+
     eos-admin addvm <username> <server_name> <server_uuid>
         Add a particular server to a user's account.
-    
+
     eos-admin addcredit <username> <credit>
         Add credit to a user. Negative amounts deduct credit.
 
     eos-admin changepwd <username> <password>
         Change a user's password.""")
-    
