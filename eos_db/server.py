@@ -13,7 +13,13 @@ from eos_db.models import State, ArtifactState, Deboost
 from eos_db.models import Resource, Node, Password, Credit, Specification
 from eos_db.models import Base
 
-from eos_db.settings import DBDetails as DB
+DB = None
+try:
+    from eos_db.settings import DBDetails as DB
+except:
+    # If no settings file is supplied, connect to the database eos_db without
+    # a username or password - ie. rely on PostgreSQL ident auth.
+    pass
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -33,12 +39,17 @@ def choose_engine(enginestring):
     global engine
 
     if enginestring == "PostgreSQL":
-        engine = create_engine('postgresql://' +
-                               DB.username +
-                               ':' +
-                               DB.password +
-                               '@localhost:5432/eos_db',
-                               echo=True)
+        if DB and DB.username:
+            # Password auth
+            engine = create_engine('postgresql://%s:%s@%s/%s'
+                                   % ( DB.username, DB.password, DB.host, DB.database ),
+                                   echo=True)
+        elif DB:
+            engine = create_engine('postgresql:///%s'
+                                   % ( DB.database ),
+                                   echo=True)
+        else:
+            engine = create_engine('postgresql:///eos_db', echo=True)
 
     elif enginestring == "SQLite":
         engine = create_engine('sqlite://', echo=True)
