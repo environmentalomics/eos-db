@@ -4,26 +4,41 @@
 
 import unittest
 from webtest import TestApp
+# FIXME - do not rely on pyramid.paster for this
 from pyramid.paster import get_app
 
 class TestVMAPI(unittest.TestCase):
     """Tests API functions associated with VM actions.
+       Note that all tests are in-process, we don't actually start a http server.
     """
     def setUp(self):
         """Launch pserve using webtest with test settings"""
         self.myapp = get_app('../../test.ini')
         app = TestApp(self.myapp)
-        response = app.post('/setup')
-        assert(response.status=='200 OK')
+
+        # At this point I need to authenticate as administrator:asdf,
+        # but really I should be able to supply a username and password in
+        # the line above.
+        app.authorization = ('Basic', ('administrator', 'asdf'))
+
+        #Note the response is checked for you.
+        response = app.post('/setup', )
         response = app.post('/setup_states')
-        assert(response.status=='200 OK')
 
     def test_environment(self):
         """Does the home page of the API return 200 OK on get?
         """
         app = TestApp(self.myapp)
-        response = app.get('/')
-        assert(response.status=='200 OK')
+        response = app.get('/', status=200)
+
+    def test_list_users(self):
+        """As an admin I should be able to list the users
+        """
+        app = TestApp(self.myapp)
+
+        response = app.get('/users', status=200)
+
+        print(response.json)
 
     def test_start_server(self):
         """Tests the results of calling API to start a server.
@@ -45,53 +60,6 @@ class TestVMAPI(unittest.TestCase):
         response = app.get('/servers/asdasd/state')
         assert(response.text=="Started")
 
-    def test_prestart_server(self):
-        """Tests the results of calling API to stop a server.
-        """
-        app = TestApp(self.myapp)
-        response = app.post('/')
-        response = app.post('/')
-        assert(response.text=="Started")
-
-    def test_prestop_server(self):
-        """Tests the results of calling API to stop a server.
-        """
-        app = TestApp(self.myapp)
-        response = app.post('/')
-        response = app.post('/')
-        assert(response.text=="Started")
-
-    def test_preboost_server(self):
-        """Tests the results of calling API to stop a server.
-        """
-        app = TestApp(self.myapp)
-        response = app.post('/')
-        response = app.post('/')
-        assert(response.text=="Started")
-
-    def test_boost_server(self):
-        """Tests the results of calling API to stop a server.
-        """
-        app = TestApp(self.myapp)
-        response = app.post('/')
-        response = app.post('/')
-        assert(response.text=="Started")
-
-    def test_add_specification(self):
-        """Tests the results of calling API to stop a server.
-        """
-        app = TestApp(self.myapp)
-        response = app.post('/')
-        response = app.post('/')
-        assert(response.text=="Started")
-
-    def test_read_specification(self):
-        """Tests the results of calling API to stop a server.
-        """
-        app = TestApp(self.myapp)
-        response = app.post('/')
-        response = app.post('/')
-        assert(response.text=="Started")
 
 
 if __name__ == '__main__':

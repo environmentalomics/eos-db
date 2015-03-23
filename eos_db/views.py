@@ -27,7 +27,7 @@ def home_view(request):
                               "users": "/users", # Return user list
                               "user": "/users/{name}",   # Get user details or
                               "user_touches": "/users/{name}/touches",
-                              "user_password": "/users/{name}/password",                    
+                              "user_password": "/users/{name}/password",
                               "user_credit": "/users/{name}/credit",
                               "servers": "/servers", # Return server list
                               "server": "/servers/{name}",    # Get server details or
@@ -118,6 +118,8 @@ def create_user_password(request):
 
 @view_config(request_method="GET", route_name='user_password', renderer='json', permission="use")
 def retrieve_user_password(request):
+    """What the actual fuck??  -- TIM
+    """
     # Add salt and hash
     verify = server.check_password(request.GET['actor_id'],request.GET['password'])
     if verify == True:
@@ -244,10 +246,10 @@ def start_server(request):
 @view_config(request_method="POST", route_name='server_restart', renderer='json', permission="token")
 def restart_server(request):
     """Put a server into the "restart" status.
-    
+
     :param vm_id: ID of VApp which we want to start.
     :returns: JSON containing VApp ID and job ID for progress calls.
-    """   
+    """
     newname = server.touch_to_restart(request.POST['vm_id'])
     return newname
 

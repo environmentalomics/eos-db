@@ -6,6 +6,8 @@ from paste.httpheaders import WWW_AUTHENTICATE
 from pyramid.interfaces import IAuthenticationPolicy
 from pyramid.security import Everyone
 from pyramid.security import Authenticated
+from pyramid.view import forbidden_view_config
+from pyramid.httpexceptions import HTTPUnauthorized
 
 from zope.interface import implements
 
@@ -29,10 +31,14 @@ def _get_basicauth_credentials(request):
     return None
 
 class BasicAuthenticationPolicy(object):
-    
+    """An instance of this is passed to pyramid.config.Configurator in __init__.py
+       with `check` being a callback to a function that checks passwords against
+       the database or the agents shared secret.
+    """
+
     implements(IAuthenticationPolicy)
 
-    def __init__(self, check, realm='Realm'):
+    def __init__(self, check, realm='eos_db'):
         self.check = check
         self.realm = realm
 
@@ -67,6 +73,13 @@ class BasicAuthenticationPolicy(object):
     def remember(self, request, principal, **kw):
         return []
 
-    def forget(self, request):
-        head = WWW_AUTHENTICATE.tuples('Basic realm="%s"' % self.realm)
-        return head
+#     def forget(self, request):
+#         head = WWW_AUTHENTICATE.tuples('Basic realm="%s"' % self.realm)
+#         return head
+
+    #Ensure that unauthenticated users get told to log in.
+    #Not sure where this really belongs.
+    def forbidden_view(self, request, foo):
+        resp = HTTPUnauthorized()
+        resp.www_authenticate = 'Basic realm="%s"' % self.realm
+        return resp
