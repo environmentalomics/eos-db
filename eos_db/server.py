@@ -385,6 +385,11 @@ def check_progress(job_id):
 ##############################################################################
 
 def touch_to_add_password(actor_id, password):
+    """Sets the password for a user.
+
+    :param actor_id: An existing actor id.
+    :param password: The unencrypted password.
+    """
     touch_id = _create_touch(actor_id, None, None)
     password_id = create_password(touch_id, password)
     return password_id
@@ -521,13 +526,10 @@ def create_ownership(touch_id, user_id):
 def check_password(actor_id, password):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    our_password = session.query(Password).filter_by(password=password).filter(Password.touch_id==Touch.
-id).filter(Touch.actor_id==Actor.id).filter(Actor.handle==actor_id).first()
+    our_password = session.query(Password).filter(Password.touch_id==Touch.
+id).filter(Touch.actor_id==Actor.id).filter(Actor.handle==actor_id).order_by(Touch.id.desc()).first()
     session.close()
-    if our_password is None:
-        return False
-    else:
-        return True
+    return our_password.check(password)
 
 def _create_credit(touch_id, credit):
     """Creates a credit resource.

@@ -25,8 +25,11 @@ from eos_db import server
 arg = sys.argv[1:]
 
 if len(arg) == 0:
-    print ('No arguments provided. Please type "eos-admin help" for more info.')
+    print ('No arguments provided. Type "eos-admin help" for more info.')
     sys.exit()
+
+# This only works with PostgreSQL??
+server.choose_engine("PostgreSQL")
 
 if arg[0] == 'adduser':
     print ("Adding user...")
@@ -36,10 +39,9 @@ if arg[0] == 'adduser':
         password = arg[2]
         realname = arg[3] if len(arg) >= 4 else username
     except IndexError:
-        print ("Please ensure you enter a username and password.")
+        print ("Ensure you enter a username and password.")
         sys.exit()
 
-    server.choose_engine("PostgreSQL")
     id = server.create_user("user", username, realname, username)
     print ("New user created with id %s" % id)
     server.touch_to_add_password(id, password)
@@ -52,39 +54,62 @@ elif arg[0] == 'addvm':
         machine_name = arg[2]
         machine_uuid = arg[3]
     except IndexError:
-        print ("Please ensure you enter a username, machine name, and UUID.")
+        print ("Ensure you enter a username, machine name, and UUID.")
         sys.exit()
 
-    server.choose_engine("PostgreSQL")
     id = server.create_appliance(machine_name, machine_uuid)
-    user_id = server.get_user_id_from_name(username)
+    try:
+        user_id = server.get_user_id_from_name(username)
+    except TypeError:
+        print("No such user.")
+        sys.exit()
     id = server.touch_to_add_ownership(id, user_id)
     print ("New server created with id %s" % id)
     print ("New server ownership added to user id %s" % user_id)
 
-elif arg[0] == 'addcredit': #TODO
-    if arg[1]:
+elif arg[0] == 'addcredit':
+    print ("Adding credit...")
+
+    try:
         username = arg[1]
-    else:
-        print ("No username specified.")
-        sys.exit()
-    if arg[2]:
-        password = arg[2]
-    else:
-        print ("No credit amount specified.")
+        credit = int(arg[2])
+    except IndexError, ValueError:
+        print ("Specify a user name and integer credit amount.")
         sys.exit()
 
-elif arg[0] == 'changepwd': #TODO
-    if arg[1]:
+    try:
+        user_id = server.get_user_id_from_name(username)
+    except TypeError:
+        print("No such user.")
+        sys.exit()
+    server.touch_to_add_credit(user_id, credit)
+
+    #For some reason this call needs the username, not the ID.
+    credits_now = server.check_credit(username)
+    print("User %s now has %i credits." % (username, credits_now))
+
+elif arg[0] == 'changepwd':
+    print ("Changing password...")
+
+    try:
         username = arg[1]
-    else:
-        print ("No username specified.")
-        sys.exit()
-    if arg[2]:
         password = arg[2]
-    else:
-        print ("No password specified.")
+    except IndexError:
+        print ("No username or password specified.")
         sys.exit()
+
+    try:
+        user_id = server.get_user_id_from_name(username)
+    except TypeError:
+        print("No such user.")
+        sys.exit()
+    pwd = server.touch_to_add_password(user_id, password)
+
+    #Sanity check...
+    if server.check_password(username, password):
+        print("User %s password set." % (username))
+    else:
+        print("Failed to set the password!")
 
 else:
     print ("""

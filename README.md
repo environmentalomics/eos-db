@@ -4,19 +4,20 @@ Database and API server for Cloudhands-EOS system.
 # Quickstart for Ubuntu 14.04
 
 
- $ apt-get install python-dev postgresql libpq-dev
+ ```$ apt-get install python-dev python-virtualenv postgresql libpq-dev```
 
- $ virtualenv ~/eoscloud/py2venv
- $ wget -q -O- https://bootstrap.pypa.io/get-pip.py | ~/eoscloud-venv/py2venv/bin/python
+ ```$ virtualenv ~/eoscloud-py2-venv```
 
- $ sudo -Hi -u postgres createuser -w $USERNAME -DRS
- $ sudo -Hi -u postgres createdb -w eoscloud -E UTF8 -O $USER
+ ```$ sudo -Hi -u postgres createuser -w $USERNAME -DRS```
+ ```$ sudo -Hi -u postgres createdb -w eos_db -E UTF8 -O $USER```
 
- $ ~/eoscloud-venv/bin/python setup.py develop
+ ```$ ~/eoscloud-py2-venv/bin/python setup.py develop```
 
-Now use the eos-admin tool (type "eos-admin help" at the command line) to configure your users and servers, before starting the DB:
+ ```$ ~/eoscloud-py2-venv/bin/python bin/eos-init```
+ ```$ ~/eoscloud-py2-venv/bin/python bin/eos-admin help```
+Use this tool to configure your users and servers, before starting the DB:
 
- $ ~/eoscloud-venv/bin/pserve development.ini
+ ```$ ~/eoscloud-py2-venv/bin/pserve development.ini```
  
 # Notes
 
