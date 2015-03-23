@@ -149,7 +149,7 @@ def create_user_credit(request):
     if credit.lstrip('-').isdigit() == False:
         return HTTPBadRequest()
     if server.check_actor_id(actor_id) == False:
-        return HTTPForbidden()
+        return HTTPUnauthorized()
     user_id = server.get_user_id_from_name(actor_id)
     server.touch_to_add_credit(user_id, credit)
     credits = server.check_credit(actor_id)
@@ -167,9 +167,9 @@ def retrieve_user_credit(request):
     """
     actor_id = request.GET['actor_id']
     if server.check_actor_id(actor_id) == False:
-        return HTTPForbidden()
+        return HTTPNotFound()
     credits = server.check_credit(actor_id)
-    output = json.dumps({'actor_id': int(actor_id),
+    output = json.dumps({'actor_id': actor_id,
                          'credit_balance': int(credits)}, sort_keys=True)
     return output
 

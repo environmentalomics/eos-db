@@ -65,7 +65,7 @@ def deploy_tables():
 
 def setup_states(state_list):
     for state in state_list:
-        _create_artifact_state(state)
+        _create_artifact_state(state) # Make sure states must be distinct
 
 ##############################################################################
 
