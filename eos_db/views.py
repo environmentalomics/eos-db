@@ -237,10 +237,10 @@ def start_server(request):
     :param vm_id: ID of VApp which we want to start.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    token = server.touch_to_prestart(request.POST['eos-token'])
+    token = server.touch_to_state(request.POST['eos-token'],  "Starting")
     if server.check_token(token, vm_id):
-        newname = server.touch_to_prestart(request.POST['vm_id'])
-        return newname
+        touch_id = server.touch_to_state(request.POST['vm_id'], "Starting")
+        return touch_id
     else:
         return HTTPUnauthorized
 
@@ -251,8 +251,8 @@ def restart_server(request):
     :param vm_id: ID of VApp which we want to start.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_restart(request.POST['vm_id'])
-    return newname
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Restarting")
+    return touch_id
 
 @view_config(request_method="POST", route_name='server_stop', renderer='json', permission="use")
 def stop_server(request):
@@ -261,8 +261,8 @@ def stop_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_prestop(request.POST['vm_id'])
-    return newname
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Stopping")
+    return touch_id
 
 @view_config(request_method="POST", route_name='server_prepare', renderer='json', permission="use")
 def prepare_server(request):
@@ -271,8 +271,8 @@ def prepare_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_prepare(request.POST['vm_id'])
-    return newname
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Preparing")
+    return touch_id
 
 @view_config(request_method="POST", route_name='server_pre_deboost', renderer='json', permission="use")
 def pre_deboost_server(request):
@@ -281,8 +281,8 @@ def pre_deboost_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_pre_deboost(request.POST['vm_id'])
-    return newname
+    touch_id = server.touch_to_state(request.POST['vm_id'],  "Pre_Deboosting")
+    return touch_id
 
 @view_config(request_method="POST", route_name='server_boost', renderer='json', permission="use")
 def boost_server(request):
@@ -291,7 +291,7 @@ def boost_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    touch_id = server.touch_to_boost(request.POST['vm_id']) # Boost Server
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Boosting") # Boost Server
 
     # Now check if boost was successful, set deboost and remove credits accordingly.
     if touch_id:
@@ -305,43 +305,43 @@ def boost_server(request):
 
 @view_config(request_method="POST", route_name='server_stopped', renderer='json', permission="use")
 def stopped_server(request):
-    """Put a server into the "Stopping" status.
+    """Put a server into the "Stopped" status.
 
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_stop(request.POST['vm_id'])
-    return newname
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Stopped")
+    return touch_id
 
 @view_config(request_method="POST", route_name='server_started', renderer='json', permission="use")
 def started_server(request):
-    """Put a server into the "Starting" status.
+    """Put a server into the "Started" status.
 
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_start(request.POST['vm_id'])
-    return newname
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Started")
+    return touch_id
 
 @view_config(request_method="POST", route_name='server_prepared', renderer='json', permission="use")
 def prepared_server(request):
-    """Put a server into the "Starting" status.
+    """Put a server into the "Prepared" status.
 
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_prepared(request.POST['vm_id'])
-    return newname
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Prepared")
+    return touch_id
 
 @view_config(request_method="POST", route_name='server_pre_deboosted', renderer='json', permission="use")
 def predeboosted_server(request):
-    """Put a server into the "Starting" status.
+    """Put a server into the "Pre_Deboosted" status.
 
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_predeboosted(request.POST['vm_id'])
-    return newname
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Pre_Deboosted")
+    return touch_id
 
 @view_config(request_method="GET", route_name='server_job_status', renderer='json', permission="use")
 def retrieve_job_progress(request):

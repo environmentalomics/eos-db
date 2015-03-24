@@ -8,12 +8,7 @@ from eos_db.server import (check_state,
                            deploy_tables,
                            override_engine,
                            create_appliance,
-                           touch_to_prestart,
-                           touch_to_prestop,
-                           touch_to_prepare,
-                           touch_to_boost,
-                           touch_to_start,
-                           touch_to_stop,
+                           touch_to_state,
                            touch_to_add_specification,
                            get_latest_specification,
                            get_previous_specification,
@@ -36,53 +31,56 @@ class TestVMFunctions(unittest.TestCase):
         deploy_tables()
         setup_states(STATE_LIST)
 
+    # These 6 are probably redundant now we test all the calls via the web API?
     def test_start_server(self):
-        """Check touch_to_start puts a server into "Started" state.
+        """Check touch_to_state puts a server into "Started" state.
         """
         artifact_id = create_appliance("teststarted")
-        touch_to_start(artifact_id)
+        touch_to_state(artifact_id, "Started")
         status = check_state(artifact_id)
-        assert status == "Started"
+        self.assertEqual(status, "Started")
 
     def test_stop_server(self):
-        """Check touch_to_stop puts a server into "Stopped" state.
+        """Check touch_to_state puts a server into "Stopped" state.
         """
         artifact_id = create_appliance("teststopped")
-        touch_to_stop(artifact_id)
+        touch_to_state(artifact_id, "Stopped")
         status = check_state(artifact_id)
-        assert status == "Stopped"
+        self.assertEqual(status, "Stopped")
 
     def test_prestart_server(self):
-        """Check touch_to_prestart puts a server into "Starting" state.
+        """Check touch_to_state puts a server into "Starting" state.
         """
         artifact_id = create_appliance("teststart")
-        touch_to_prestart(artifact_id)
+        touch_to_state(artifact_id, "Starting")
         status = check_state(artifact_id)
-        assert status == "Starting"
+        self.assertEqual(status, "Starting")
 
-    def test_prestop_server(self):
-        """Check touch_to_prestop puts a server into "Stopping" state.
+    @unittest.expectedFail
+    def test_restart_server(self):
+        """Check touch_to_state puts a server into "Restarting" state.
+            ** Expected fail - Restart state was removed
         """
-        artifact_id = create_appliance("teststop")
-        touch_to_prestop(artifact_id)
+        artifact_id = create_appliance("testrestart")
+        touch_to_state(artifact_id, "Restart")
         status = check_state(artifact_id)
-        assert status == "Stopping"
+        self.assertEqual(status, "Restart")
 
     def test_preboost_server(self):
-        """Check touch_to_prestop puts a server into "Preparing" state.
+        """Check touch_to_state puts a server into "Preparing" state.
         """
         artifact_id = create_appliance("testpreboost")
-        touch_to_prepare(artifact_id)
+        touch_to_state(artifact_id, "Preparing")
         status = check_state(artifact_id)
-        assert status == "Preparing"
+        self.assertEqual(status, "Preparing")
 
     def test_boost_server(self):
-        """Check touch_to_prestop puts a server into "Boosting" state.
+        """Check touch_to_state puts a server into "Boosting" state.
         """
         artifact_id = create_appliance("testboost")
-        touch_to_boost(artifact_id)
+        touch_to_state(artifact_id, "Boosting")
         status = check_state(artifact_id)
-        assert status == "Boosting"
+        self.assertEqual(status, "Boosting")
 
     def test_add_specification(self):
         """Add a specification to a machine and recall it."""

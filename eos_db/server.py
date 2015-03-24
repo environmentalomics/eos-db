@@ -300,8 +300,9 @@ def check_ownership(artifact_id, actor_id):
 def get_state_id_by_name(name):
     """Gets the id of a state from the name associated with it.
 
-
-
+    :param name: A printable state name, as passed to setup_states
+    :returns: The corresponding internal state_id
+    :raises: IndexError if there is no such state
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
@@ -311,98 +312,19 @@ def get_state_id_by_name(name):
     session.close()
     return state_id
 
-
-
-def touch_to_start(artifact_id):
-    """Creates a touch to move the VM into the "pre-start" status.
-
-    :param artifact_id: ID of the VM we want to state-shift.
-    :returns: ID of progress reference.
-    """
-    state_id = get_state_id_by_name("Started")
-    touch_id = _create_touch(None, artifact_id, state_id)
-    return touch_id
-
-def touch_to_restart(artifact_id):
-    """Creates a touch to move the VM into the "pre-start" status.
-    
-    :param artifact_id: ID of the VM we want to state-shift.
-    :returns: ID of progress reference.
-    """
-    state_id = get_state_id_by_name("Restarting")
-    touch_id = _create_touch(None, artifact_id, state_id)
-    return touch_id
-
-def touch_to_prestart(artifact_id):
-    """Creates a touch to move the VM into the "pre-start" status.
+def touch_to_state(artifact_id, state_name):
+    """Creates a touch to move the VM into a given status.
+    The state must be a valid state name as passed to setup_states
+    - eg. Started, Restarting.
 
     :param artifact_id: ID of the VM we want to state-shift.
-    :returns: ID of progress reference.
+    :param state_name: Target state name, which will be mapped to an ID for us.
+    :returns: touch ID
     """
-    state_id = get_state_id_by_name("Starting")
+    #Supplying an invalid state will trigger an exception here.
+    #Ensure the states were properly loaded in the DB.
+    state_id = get_state_id_by_name(state_name)
     touch_id = _create_touch(None, artifact_id, state_id)
-    return touch_id
-
-def touch_to_prepare(artifact_id):
-    """Creates a touch to move the VM into the "prepare" status.
-
-    :param artifact_id: ID of the VM we want to state-shift.
-    :returns: ID of progress reference.
-    """
-    state_id = get_state_id_by_name("Preparing")
-    touch_id = _create_touch(None, artifact_id, state_id)
-    return touch_id
-
-def touch_to_pre_deboost(artifact_id):
-    """Creates a touch to move the VM into the "prepare" status.
-
-    :param artifact_id: ID of the VM we want to state-shift.
-    :returns: ID of progress reference.
-    """
-    state_id = get_state_id_by_name("Pre_Deboosting")
-    touch_id = _create_touch(None, artifact_id, state_id)
-    return touch_id
-
-def touch_to_stop(artifact_id):
-    """Creates a touch to move the VM into the "pre-start" status.
-
-    :param artifact_id: ID of the VM we want to state-shift.
-    :returns: ID of progress reference.
-    """
-    state_id = get_state_id_by_name("Stopped")
-    touch_id = _create_touch(None, artifact_id, state_id)
-    return touch_id
-
-def touch_to_prestop(artifact_id):
-    """Creates a touch to move the VM into the "pre-stop" status.
-
-    :param artifact_id: ID of the VM we want to state-shift.
-    :returns: ID of progress reference.
-    """
-    state_id = get_state_id_by_name("Stopping")
-    touch_id = _create_touch(None, artifact_id, state_id)
-    return touch_id
-
-def touch_to_prepared(vm_id):
-    """
-    """
-    state_id = get_state_id_by_name("Prepared")
-    touch_id = _create_touch(None, vm_id, state_id)
-    return touch_id
-
-def touch_to_predeboosted(vm_id):
-    """
-    """
-    state_id = get_state_id_by_name("Pre_Deboosted")
-    touch_id = _create_touch(None, vm_id, state_id)
-    return touch_id
-
-def touch_to_boost(vm_id):
-    """
-
-    """
-    state_id = get_state_id_by_name("Boosting")
-    touch_id = _create_touch(None, vm_id, state_id)
     return touch_id
 
 def touch_to_add_deboost(vm_id, hours):
