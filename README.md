@@ -9,12 +9,15 @@ Database and API server for Cloudhands-EOS system.
  ```$ virtualenv ~/eoscloud-py2-venv```
 
  ```$ sudo -Hi -u postgres createuser -w $USERNAME -DRS```
+
  ```$ sudo -Hi -u postgres createdb -w eos_db -E UTF8 -O $USER```
 
  ```$ ~/eoscloud-py2-venv/bin/python setup.py develop```
 
  ```$ ~/eoscloud-py2-venv/bin/python bin/eos-init```
+
  ```$ ~/eoscloud-py2-venv/bin/python bin/eos-admin help```
+
 Use this tool to configure your users and servers, before starting the DB:
 
  ```$ ~/eoscloud-py2-venv/bin/pserve development.ini```

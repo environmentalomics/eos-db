@@ -25,30 +25,34 @@ def add_cors_headers_response_callback(event):
 def passwordcheck(credentials, request):
     login = credentials['login']
     password = credentials['password']
-    
+
     ###################################################
-    
+
     # Replace this with shared secret.
-    
+
     USERS = {'agent':'asdf',
           'administrator':'asdf'}
     GROUPS = {'agent':['group:users'],
               'administrator':['group:administrators']}
-    
+
     ###################################################
-    
+
     if login in USERS and USERS[login] == password:
         return GROUPS.get(login, [])
     else:
         return None
-    
+
 def main(global_config, **settings):
-    
-    config = Configurator(settings=settings, 
-                          authentication_policy=BasicAuthenticationPolicy(passwordcheck),
+
+    bap = BasicAuthenticationPolicy(passwordcheck)
+    config = Configurator(settings=settings,
+                          authentication_policy=bap,
                           root_factory='eos_db.models.RootFactory')
-    
+
     config.add_subscriber(add_cors_headers_response_callback, NewRequest)
+
+    #Needed to ensure proper 401 responses
+    config.add_forbidden_view(bap.forbidden_view)
 
 
     settings = config.registry.settings
@@ -105,17 +109,17 @@ def main(global_config, **settings):
     config.add_route('server_stop', '/servers/{name}/stop')
 
     config.add_route('server_restart', '/servers/{name}/restart')
-    
+
     config.add_route('server_pre_deboost', '/servers/{name}/pre_deboosting')
     config.add_route('server_pre_deboosted', '/servers/{name}/Pre_deboosted')
-    
+
     config.add_route('server_deboost', '/servers/{name}/deboosting')
     config.add_route('server_deboosted', '/servers/{name}/Deboosted')
-    
-    
+
+
     config.add_route('server_started', '/servers/{name}/Started')
     config.add_route('server_stopped', '/servers/{name}/Stopped')
-    
+
     config.add_route('server_prepare', '/servers/{name}/prepare')
     config.add_route('server_prepared', '/servers/{name}/prepared')
 
@@ -134,3 +138,4 @@ def main(global_config, **settings):
 
     config.scan()
     return config.make_wsgi_app()
+

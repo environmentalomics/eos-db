@@ -21,13 +21,16 @@ from pyramid.security import Allow, Everyone
 from bcrypt import hashpw, gensalt
 
 class RootFactory(object):
+    """This is passed to pyramid.config.Configuratore in __init__.py,
+       and says what persissions each group gets.
+    """
     __acl__ = [ (Allow, Everyone, 'token'),
                 (Allow, 'group:users', 'use'),
                 (Allow, 'group:agents', 'use'),
                 (Allow, 'group:agents', 'act'),
-                (Allow, 'group:adminstrators', 'use'),
-                (Allow, 'group:adminstrators', 'act'),
-                (Allow, 'group:adminstrators', 'administrate') ]
+                (Allow, 'group:administrators', 'use'),
+                (Allow, 'group:administrators', 'act'),
+                (Allow, 'group:administrators', 'administer') ]
     def __init__(self, request):
         pass
 
@@ -238,8 +241,8 @@ class Password(Resource):
 
     def check(self, candidate):
         """Checks if a candidate password matches the stored crypt-ed password.
+           Caller should use this rather than attempting manual comparison.
         """
-        print("xxx" + str(self.password))
         return str(self.password) == hashpw(str(candidate), str(self.password))
 
 class Credit(Resource):
