@@ -255,7 +255,6 @@ class Password(Resource):
         """Checks if a candidate password matches the stored crypt-ed password.
            Caller should use this rather than attempting manual comparison.
         """
-        print str(candidate)
         return str(self.password) == hashpw(str(candidate), str(self.password))
 
 class Credit(Resource):

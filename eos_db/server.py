@@ -596,7 +596,8 @@ def check_password(actor_id, password):
     our_password = session.query(Password).filter(Password.touch_id==Touch.
 id).filter(Touch.actor_id==Actor.id).filter(Actor.handle==actor_id).order_by(Touch.id.desc()).first()
     session.close()
-    return our_password.check(password)
+    
+    return our_password.check(str(password))
 
 def _create_credit(touch_id, credit):
     """Creates a credit resource.
@@ -676,7 +677,11 @@ def check_user_details(user_id):
 ##############################################################################
 
 def check_state(artifact_id):
-    return _get_most_recent_artifact_state(artifact_id)[0]
+    state = _get_most_recent_artifact_state(artifact_id)
+    if state is None:
+        return None
+    else:
+        return state[0]
 
 ##############################################################################
 
