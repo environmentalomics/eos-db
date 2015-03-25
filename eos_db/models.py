@@ -255,6 +255,7 @@ class Password(Resource):
         """Checks if a candidate password matches the stored crypt-ed password.
            Caller should use this rather than attempting manual comparison.
         """
+        # This only works on Py3!
         return self.password == hashpw(str(candidate).encode(), self.password)
 
 class Credit(Resource):
