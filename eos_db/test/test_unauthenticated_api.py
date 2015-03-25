@@ -1,4 +1,4 @@
-"""Tests for what eos_db says when user does not autenticate.
+"""Tests for what eos_db says when user does not authenticate.
 
 """
 

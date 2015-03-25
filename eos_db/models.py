@@ -220,6 +220,18 @@ class Node(Resource):
 
     __mapper_args__ = {"polymorphic_identity": "node"}
 
+class GroupMembership(Resource):
+    """
+    Represents a membership of a user group.
+    """
+    __tablename__ = "groupmembership"
+
+    id = Column("id", Integer, ForeignKey("resource.id"),
+                nullable=False, primary_key=True)
+    group = Column("group", String(length=64), nullable=False)
+
+    __mapper_args__ = {"polymorphic_identity": "groupmembership"}
+
 class Password(Resource):
     """
     Represents a password, which will be bcrypt'ed for you.
@@ -243,6 +255,7 @@ class Password(Resource):
         """Checks if a candidate password matches the stored crypt-ed password.
            Caller should use this rather than attempting manual comparison.
         """
+        print str(candidate)
         return str(self.password) == hashpw(str(candidate), str(self.password))
 
 class Credit(Resource):

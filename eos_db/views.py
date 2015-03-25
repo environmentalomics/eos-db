@@ -64,20 +64,32 @@ def options(request):
 
 # Views for setting up test databases
 
-@view_config(request_method="POST", route_name='setup_states', renderer='json', permission="use")
-def setup_states(request):
-    return None
-
 @view_config(request_method="POST", route_name='setup', renderer='json', permission="use")
 def setup(request):
+    server.choose_engine("SQLite")
+    server.deploy_tables()
+    return None
+
+@view_config(request_method="POST", route_name='setup_states', renderer='json', permission="use")
+def setup_states(request):
+    server.setup_states(['Starting',
+                         'Started',
+                         'Stopping',
+                         'Stopped',
+                         'Pre_Deboosting',
+                         'Pre_Deboosted',
+                         'Preparing',
+                         'Prepared',
+                         'Boosting',
+                         'Boosted',
+                         'Restarting'])
     return None
 
 # User-related API calls - All users
 
 @view_config(request_method="GET", route_name='users', renderer='json', permission="use")
 def retrieve_users(request):
-    ## FIXME
-    return name
+    return HTTPNotImplemented()
 
 # User-related API calls - Individual users
 
@@ -119,8 +131,6 @@ def create_user_password(request):
 
 @view_config(request_method="GET", route_name='user_password', renderer='json', permission="use")
 def retrieve_user_password(request):
-    """What the actual fuck??  -- TIM
-    """
     # Add salt and hash
     verify = server.check_password(request.GET['actor_id'],request.GET['password'])
     if verify == True:
@@ -197,7 +207,7 @@ def retrieve_servers_in_state(request):
 
 @view_config(request_method="PUT", route_name='server', renderer='json', permission="use")
 def create_server(request):
-    newname = server.create_appliance(request.POST['hostname'])
+    newname = server.create_appliance(request.POST['hostname'], request.POST['uuid'])
     return newname
 
 @view_config(request_method="GET", route_name='server', renderer='json', permission="use")
@@ -228,6 +238,10 @@ def create_server_owner(request):
     newname = server.touch_to_add_ownership(request.POST['artifact_id'], request.POST['actor_id'])
     return newname
 
+@view_config(request_method="GET", route_name='server_owner', renderer='json', permission="use")
+def get_server_owner(request):
+    return HTTPNotImplemented
+
 # State changes
 
 @view_config(request_method="POST", route_name='server_start', renderer='json', permission="token")
@@ -237,8 +251,7 @@ def start_server(request):
     :param vm_id: ID of VApp which we want to start.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    token = server.touch_to_state(request.POST['eos-token'],  "Starting")
-    if server.check_token(token, vm_id):
+    if server.check_token(request.POST['eos_token'], request.POST['vm_id']):
         touch_id = server.touch_to_state(request.POST['vm_id'], "Starting")
         return touch_id
     else:
@@ -274,6 +287,17 @@ def prepare_server(request):
     touch_id = server.touch_to_state(request.POST['vm_id'], "Preparing")
     return touch_id
 
+@view_config(request_method="GET", route_name='server_state', renderer='json', permission="use")
+def server_state(request):
+    """Put a server into the "pre-stop" status.
+
+    :param vm_id: ID of VApp which we want to stop.
+    :returns: JSON containing VApp ID and job ID for progress calls.
+    """
+    id = server.get_server_id_from_name(request.GET['artifact_id'])
+    newname = server.check_state(id)
+    return newname
+
 @view_config(request_method="POST", route_name='server_pre_deboost', renderer='json', permission="use")
 def pre_deboost_server(request):
     """Put a server into the "pre-deboost" status.
@@ -294,13 +318,13 @@ def boost_server(request):
     touch_id = server.touch_to_state(request.POST['vm_id'], "Boosting") # Boost Server
 
     # Now check if boost was successful, set deboost and remove credits accordingly.
-    if touch_id:
-        credit_change = server.check_and_remove_credits(request.POST['vm_id'],
-                                                        request.POST['ram'],
-                                                        request.POST['cores'],
-                                                        request.POST['hours'])
-        server.touch_to_add_deboost(request.POST['vm_id'], request.POST['hours'])
-    return credit_change
+    #if touch_id:
+    #    credit_change = server.check_and_remove_credits(request.POST['vm_id'],
+    #                                                    request.POST['ram'],
+    #                                                    request.POST['cores'],
+    #                                                    request.POST['hours'])
+    #    server.touch_to_add_deboost(request.POST['vm_id'], request.POST['hours'])
+    #return credit_change
 
 
 @view_config(request_method="POST", route_name='server_stopped', renderer='json', permission="use")
@@ -366,8 +390,14 @@ def retrieve_server_touches(request):
 def set_server_specification(request):
     name = request.matchdict['name']
     vm_id = server.get_server_id_from_name(name)
-    server.touch_to_add_specification(vm_id, request.POST['cores'], request.POST['ram'])
-    return name
+    
+    # Filter for bad requests
+    
+    if (request.POST['cores'] not in ['1','2','4','16']) or (request.POST['ram'] not in ['1','4','8','16','500']):
+        return HTTPBadRequest()
+    else:
+        server.touch_to_add_specification(vm_id, request.POST['cores'], request.POST['ram'])
+        return name
 
 @view_config(request_method="GET", route_name='server_specification', renderer='json', permission="use")
 def get_server_specification(request):

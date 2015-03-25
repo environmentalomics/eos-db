@@ -25,20 +25,16 @@ def add_cors_headers_response_callback(event):
 def passwordcheck(credentials, request):
     login = credentials['login']
     password = credentials['password']
-
-    ###################################################
-
-    # Replace this with shared secret.
-
-    USERS = {'agent':'asdf',
-          'administrator':'asdf'}
-    GROUPS = {'agent':['group:users'],
-              'administrator':['group:administrators']}
-
-    ###################################################
-
-    if login in USERS and USERS[login] == password:
-        return GROUPS.get(login, [])
+    
+    if eos_db.server.check_password(login, password):
+        if eos_db.server.get_user_group(login)[0] == "administrators":
+            return ['group:administrators']
+        elif eos_db.server.get_user_group(login)[0] == "users":
+            return ['group:users']
+        elif eos_db.server.get_user_group(login)[0] == "agents":
+            return ['group:agents']
+        else:
+            return None
     else:
         return None
 
@@ -78,7 +74,7 @@ def main(global_config, **settings):
 
     config.add_route('users', '/users') # Return user list
     config.add_route('user', '/users/{name}')   # Get user details or
-                                                        # Post new user or
+                                                        # Put new user or
                                                         # Delete user
 
     config.add_route('user_touches', '/users/{name}/touches')
@@ -105,30 +101,28 @@ def main(global_config, **settings):
 
     config.add_route('states', '/states/{name}') # Get list of servers in given state.
 
-    config.add_route('server_start', '/servers/{name}/start')
-    config.add_route('server_stop', '/servers/{name}/stop')
+    config.add_route('server_start', '/servers/{name}/Starting')
+    config.add_route('server_stop', '/servers/{name}/Stopping')
 
-    config.add_route('server_restart', '/servers/{name}/restart')
+    config.add_route('server_restart', '/servers/{name}/Restarting')
 
-    config.add_route('server_pre_deboost', '/servers/{name}/pre_deboosting')
-    config.add_route('server_pre_deboosted', '/servers/{name}/Pre_deboosted')
-
-    config.add_route('server_deboost', '/servers/{name}/deboosting')
-    config.add_route('server_deboosted', '/servers/{name}/Deboosted')
-
+    config.add_route('server_pre_deboost', '/servers/{name}/Pre_Deboosting')
+    config.add_route('server_pre_deboosted', '/servers/{name}/Pre_Deboosted')
 
     config.add_route('server_started', '/servers/{name}/Started')
     config.add_route('server_stopped', '/servers/{name}/Stopped')
 
-    config.add_route('server_prepare', '/servers/{name}/prepare')
-    config.add_route('server_prepared', '/servers/{name}/prepared')
+    config.add_route('server_prepare', '/servers/{name}/Preparing')
+    config.add_route('server_prepared', '/servers/{name}/Prepared')
 
-    config.add_route('server_boost', '/servers/{name}/boost')
-    config.add_route('server_boosted', '/servers/{name}/boosted')
+    config.add_route('server_boost', '/servers/{name}/Boosting')
+    config.add_route('server_boosted', '/servers/{name}/Boosted')
 
-    config.add_route('server_suspend', '/servers/{name}/suspend')
+    config.add_route('server_state', '/servers/{name}/state')
 
-    config.add_route('server_owner', '/servers/{name}/owner')
+    config.add_route('server_owner', '/servers/{name}/owner') # 
+    
+    
     config.add_route('server_touches', '/servers/{name}/touches')
     config.add_route('server_job_status', '/servers/{name}/job/{job}/status')  # Get server touches
 
