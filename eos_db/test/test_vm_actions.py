@@ -1,4 +1,5 @@
-"""Tests for VM actions - start, stop, suspend.
+"""Tests for VM actions. This test suite uses webtest to interface with the
+WSGI interface normally served by Waitress. 
 
 """
 
@@ -21,12 +22,16 @@ from eos_db.server import (check_state,
                            get_server_id_from_name,
                            return_artifact_details)
 
-STATE_LIST = ["Starting",   # Machine was stopped, now starting up.
-              "Stopping",   # Machine was started, now stopping.
-              "Started",    # Machine is running.
-              "Stopped",    # Machine is stopped.
-              "Preparing",  # Stopping machine before a spec change.
-              "Boosting"]   # Changing specs.
+STATE_LIST = ["Starting",       # Machine was stopped, now starting up.
+              "Stopping",       # Machine was started, now stopping.
+              "Started",        # Machine is running.
+              "Stopped",        # Machine is stopped.
+              "Preparing",      # Stopping machine before a spec change.
+              "Boosting",       # Changing specs.
+              "Pre_Deboosting", # Preparing for deboost.
+              "Preparing",      # Preparing for boost.
+              "Restarting",     # Restarting machine.
+              "Deboosting"]     # Changing specs.
 
 class TestVMFunctions(unittest.TestCase):
     """Tests VM actions in server module.
@@ -125,6 +130,7 @@ class TestVMFunctions(unittest.TestCase):
         assert server_details['artifact_id'] == artifact_id
         assert server_details['state'] == "Not yet initialised"
         assert server_details['artifact_uuid'] == "returndetails"
+
 
 if __name__ == '__main__':
     unittest.main()
