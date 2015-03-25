@@ -12,7 +12,7 @@ import json
 from pyramid.view import view_config
 from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented, HTTPUnauthorized, HTTPForbidden
 import hashlib, base64, random
-from eos_db import server, auth
+from eos_db import server
 
 ##############################################################################
 

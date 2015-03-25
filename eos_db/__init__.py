@@ -46,6 +46,7 @@ def passwordcheck():
                 if user_group in ("administrators", "users", "agents"):
                     #Remember that this worked
                     lastpass[0] = login + ":" + password
+
                     return ['group:' + user_group]
                 else:
                     lastpass[0] = ""

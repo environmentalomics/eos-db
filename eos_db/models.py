@@ -248,14 +248,14 @@ class Password(Resource):
 
     def __init__(self, **kwargs):
         #Crypt it
-        kwargs['password'] = hashpw(str(kwargs['password']), gensalt())
+        kwargs['password'] = hashpw(str(kwargs['password']).encode(), gensalt())
         super(self.__class__,self).__init__(**kwargs)
 
     def check(self, candidate):
         """Checks if a candidate password matches the stored crypt-ed password.
            Caller should use this rather than attempting manual comparison.
         """
-        return str(self.password) == hashpw(str(candidate), str(self.password))
+        return self.password == hashpw(str(candidate).encode(), self.password)
 
 class Credit(Resource):
     """Represents the addition or subtraction of credit from the user's account.

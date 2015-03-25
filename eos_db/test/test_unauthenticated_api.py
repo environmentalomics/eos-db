@@ -4,7 +4,8 @@
 
 import unittest
 from webtest import TestApp
-# FIXME - do not rely on pyramid.paster for this
+# Note that pyramid.paster does work in Py3, since PasteDeploy
+# is ported.
 from pyramid.paster import get_app
 
 class TestUnAuth(unittest.TestCase):

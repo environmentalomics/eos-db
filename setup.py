@@ -21,7 +21,6 @@ if __name__ == "__main__":
         'waitress',             # Server
         'sqlalchemy',           # ORM
         'psycopg2',             # Postgres database interface
-        'paste',                # HTTP header handling for security
         'requests',             # Required for tests
         'webtest',              # Required for tests
         'bcrypt',               # Required to make passwords secure
