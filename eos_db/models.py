@@ -91,7 +91,7 @@ class Artifact(Base):
     __tablename__ = 'artifact'
 
     id = Column(Integer, primary_key=True)
-    uuid = Column("uuid", CHAR(length=32), nullable=False)
+    uuid = Column("uuid", CHAR(length=40), nullable=False)
     name = Column("name", CHAR(length=32), nullable=False)
     type = Column("type", String(length=32), nullable=False)
 

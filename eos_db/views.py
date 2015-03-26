@@ -9,6 +9,7 @@ the "server" module.
 
 import json, uuid, bcrypt
 
+from pyramid.response import Response
 from pyramid.view import view_config
 from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented, HTTPUnauthorized, HTTPForbidden
 import hashlib, base64, random
@@ -57,10 +58,11 @@ def home_view(request):
 
 # OPTIONS call result
 
-@view_config(request_method="OPTIONS", route_name='server_start', renderer='json', permission="token")
-@view_config(request_method="OPTIONS", route_name='server_stop', renderer='json', permission="token")
+@view_config(request_method="OPTIONS", route_name='servers', renderer='json')
+@view_config(request_method="OPTIONS", route_name='server_start', renderer='json')
+@view_config(request_method="OPTIONS", route_name='server_stop', renderer='json')
 def options(request):
-    return "None"
+    return None
 
 # Views for setting up test databases
 
@@ -192,7 +194,7 @@ def retrieve_user_credit(request):
 
 # Server-related API calls - All Servers
 
-@view_config(request_method="GET", route_name='servers', renderer='json', permission="use")
+@view_config(request_method="GET", route_name='servers', renderer='json', permission="token")
 def retrieve_servers(request):
     server_list = server.list_artifacts_for_user(request.GET['actor_id'])
     return server_list
@@ -251,9 +253,9 @@ def start_server(request):
     :param vm_id: ID of VApp which we want to start.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    if server.check_token(request.POST['eos_token'], request.POST['vm_id']):
-        touch_id = server.touch_to_state(request.POST['vm_id'], "Starting")
-        return touch_id
+    if server.check_token(request.headers['eos_token'], request.POST['vm_id']):
+        newname = server.touch_to_state(request.POST['vm_id'], "Starting")
+        return newname
     else:
         return HTTPUnauthorized
 
@@ -267,7 +269,7 @@ def restart_server(request):
     touch_id = server.touch_to_state(request.POST['vm_id'], "Restarting")
     return touch_id
 
-@view_config(request_method="POST", route_name='server_stop', renderer='json', permission="use")
+@view_config(request_method="POST", route_name='server_stop', renderer='json', permission="token")
 def stop_server(request):
     """Put a server into the "pre-stop" status.
 

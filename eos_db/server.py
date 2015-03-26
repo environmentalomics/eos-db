@@ -290,7 +290,8 @@ def touch_to_add_ownership(artifact_id, user_id):
 def get_server_uuid_by_id(id):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    server = session.query(Artifact.uuid).filter(id == id).first()
+    server = session.query(Artifact.uuid).filter(Artifact.id == id).first()
+    print (server)
     return server
 
 ##############################################################################
@@ -518,8 +519,6 @@ def check_password(actor_id, password):
     our_password = session.query(Password).filter(Password.touch_id == Touch.
 id).filter(Touch.actor_id == Actor.id).filter(Actor.handle == actor_id).order_by(Touch.id.desc()).first()
     session.close()
-    print (actor_id)
-    print (password)
     return our_password.check(str(password))
 
 def _create_credit(touch_id, credit):

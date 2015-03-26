@@ -19,8 +19,9 @@ def add_cors_headers_response_callback(event):
             if origin in ALLOWED_ORIGIN:
                 log.debug('Access Allowed')
                 response.headers['Access-Control-Allow-Origin'] = '*'
-                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, OPTIONS'
-                response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, OPTIONS, DELETE, PATCH'
+                response.headers['Access-Control-Allow-Headers'] = 'eos-token'
+                response.headers['Access-Control-Allow-Credentials'] = 'True'
 
     event.request.add_response_callback(cors_headers)
 
