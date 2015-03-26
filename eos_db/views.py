@@ -7,12 +7,13 @@ the "server" module.
 
 ##############################################################################
 
-import json
+import json, uuid, bcrypt
 
+from pyramid.response import Response
 from pyramid.view import view_config
 from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented, HTTPUnauthorized, HTTPForbidden
 import hashlib, base64, random
-from eos_db import server, auth
+from eos_db import server
 
 ##############################################################################
 
@@ -23,16 +24,16 @@ def home_view(request):
     call_list = {"Valid API Call List":{
                               "Setup States": "/setup_states",
                               "Sessions": "/sessions",
-                              "session": "/session", # Get session details or
-                              "users": "/users", # Return user list
-                              "user": "/users/{name}",   # Get user details or
+                              "session": "/session",  # Get session details or
+                              "users": "/users",  # Return user list
+                              "user": "/users/{name}",  # Get user details or
                               "user_touches": "/users/{name}/touches",
                               "user_password": "/users/{name}/password",
                               "user_credit": "/users/{name}/credit",
-                              "servers": "/servers", # Return server list
-                              "server": "/servers/{name}",    # Get server details or
+                              "servers": "/servers",  # Return server list
+                              "server": "/servers/{name}",  # Get server details or
                               "server_by_id": "/servers/by_id/{name}",
-                              "states": "/states/{name}", # Get list of servers in given state.
+                              "states": "/states/{name}",  # Get list of servers in given state.
                               "server_start": "/servers/{name}/start",
                               "server_stop": "/servers/{name}/stop",
                               "server_restart": "/servers/{name}/restart",
@@ -57,10 +58,11 @@ def home_view(request):
 
 # OPTIONS call result
 
-@view_config(request_method="OPTIONS", route_name='server_start', renderer='json', permission="token")
-@view_config(request_method="OPTIONS", route_name='server_stop', renderer='json', permission="token")
+@view_config(request_method="OPTIONS", route_name='servers', renderer='json')
+@view_config(request_method="OPTIONS", route_name='server_start', renderer='json')
+@view_config(request_method="OPTIONS", route_name='server_stop', renderer='json')
 def options(request):
-    return "None"
+    return None
 
 # Views for setting up test databases
 
@@ -95,7 +97,7 @@ def retrieve_users(request):
 
 @view_config(request_method="PUT", route_name='user', renderer='json', permission="use")
 def create_user(request):
-    newname = server.create_user(request.POST['type'],request.POST['handle'],request.POST['name'],request.POST['username'])
+    newname = server.create_user(request.POST['type'], request.POST['handle'], request.POST['name'], request.POST['username'])
     return newname
 
 @view_config(request_method="GET", route_name='user', renderer='json', permission="use")
@@ -126,15 +128,15 @@ def delete_user(request):
 @view_config(request_method="PUT", route_name='user_password', renderer='json', permission="use")
 def create_user_password(request):
     # Add salt and hash
-    newname = server.touch_to_add_password(request.POST['actor_id'],request.POST['password'])
+    newname = server.touch_to_add_password(request.POST['actor_id'], request.POST['password'])
     return newname
 
-@view_config(request_method="GET", route_name='user_password', renderer='json', permission="use")
+@view_config(request_method="GET", route_name='user_password', renderer='json', permission="token")
 def retrieve_user_password(request):
     # Add salt and hash
-    verify = server.check_password(request.GET['actor_id'],request.GET['password'])
+    verify = server.check_password(request.GET['actor_id'], request.GET['password'])
     if verify == True:
-        key = base64.b64encode(hashlib.sha256( str(random.getrandbits(256)) ).digest(), random.choice(['rA','aZ','gQ','hH','hG','aR','DD'])).rstrip('==')
+        key = str(uuid.UUID(bytes=bcrypt.gensalt()[8:24]))
         server.touch_to_add_session_key(request.GET['actor_id'], key)
         return key
     else:
@@ -192,12 +194,12 @@ def retrieve_user_credit(request):
 
 # Server-related API calls - All Servers
 
-@view_config(request_method="GET", route_name='servers', renderer='json', permission="use")
+@view_config(request_method="GET", route_name='servers', renderer='json', permission="token")
 def retrieve_servers(request):
     server_list = server.list_artifacts_for_user(request.GET['actor_id'])
     return server_list
 
-@view_config(request_method="GET", route_name='states', renderer='json', permission="use")
+@view_config(request_method="GET", route_name='state', renderer='json', permission="token")
 def retrieve_servers_in_state(request):
     server_id = server.list_server_in_state(request.GET['state'])
     server_uuid = server.get_server_uuid_by_id(server_id)
@@ -251,8 +253,8 @@ def start_server(request):
     :param vm_id: ID of VApp which we want to start.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    if server.check_token(request.POST['eos_token'], request.POST['vm_id']):
-        newname = server.touch_to_prestart(request.POST['vm_id'])
+    if server.check_token(request.headers['eos_token'], request.POST['vm_id']):
+        newname = server.touch_to_state(request.POST['vm_id'], "Starting")
         return newname
     else:
         return HTTPUnauthorized
@@ -264,18 +266,18 @@ def restart_server(request):
     :param vm_id: ID of VApp which we want to start.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_restart(request.POST['vm_id'])
-    return newname
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Restarting")
+    return touch_id
 
-@view_config(request_method="POST", route_name='server_stop', renderer='json', permission="use")
+@view_config(request_method="POST", route_name='server_stop', renderer='json', permission="token")
 def stop_server(request):
     """Put a server into the "pre-stop" status.
 
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_prestop(request.POST['vm_id'])
-    return newname
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Stopping")
+    return touch_id
 
 @view_config(request_method="POST", route_name='server_prepare', renderer='json', permission="use")
 def prepare_server(request):
@@ -284,8 +286,8 @@ def prepare_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_prepare(request.POST['vm_id'])
-    return newname
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Preparing")
+    return touch_id
 
 @view_config(request_method="GET", route_name='server_state', renderer='json', permission="use")
 def server_state(request):
@@ -305,8 +307,8 @@ def pre_deboost_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_pre_deboost(request.POST['vm_id'])
-    return newname
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Pre_Deboosting")
+    return touch_id
 
 @view_config(request_method="POST", route_name='server_boost', renderer='json', permission="use")
 def boost_server(request):
@@ -315,57 +317,57 @@ def boost_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    touch_id = server.touch_to_boost(request.POST['vm_id']) # Boost Server
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Boosting")  # Boost Server
 
     # Now check if boost was successful, set deboost and remove credits accordingly.
-    #if touch_id:
+    # if touch_id:
     #    credit_change = server.check_and_remove_credits(request.POST['vm_id'],
     #                                                    request.POST['ram'],
     #                                                    request.POST['cores'],
     #                                                    request.POST['hours'])
     #    server.touch_to_add_deboost(request.POST['vm_id'], request.POST['hours'])
-    #return credit_change
+    # return credit_change
 
 
 @view_config(request_method="POST", route_name='server_stopped', renderer='json', permission="use")
 def stopped_server(request):
-    """Put a server into the "Stopping" status.
+    """Put a server into the "Stopped" status.
 
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_stop(request.POST['vm_id'])
-    return newname
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Stopped")
+    return touch_id
 
 @view_config(request_method="POST", route_name='server_started', renderer='json', permission="use")
 def started_server(request):
-    """Put a server into the "Starting" status.
+    """Put a server into the "Started" status.
 
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_start(request.POST['vm_id'])
-    return newname
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Started")
+    return touch_id
 
 @view_config(request_method="POST", route_name='server_prepared', renderer='json', permission="use")
 def prepared_server(request):
-    """Put a server into the "Starting" status.
+    """Put a server into the "Prepared" status.
 
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_prepared(request.POST['vm_id'])
-    return newname
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Prepared")
+    return touch_id
 
 @view_config(request_method="POST", route_name='server_pre_deboosted', renderer='json', permission="use")
 def predeboosted_server(request):
-    """Put a server into the "Starting" status.
+    """Put a server into the "Pre_Deboosted" status.
 
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    newname = server.touch_to_predeboosted(request.POST['vm_id'])
-    return newname
+    touch_id = server.touch_to_state(request.POST['vm_id'], "Pre_Deboosted")
+    return touch_id
 
 @view_config(request_method="GET", route_name='server_job_status', renderer='json', permission="use")
 def retrieve_job_progress(request):
@@ -390,10 +392,10 @@ def retrieve_server_touches(request):
 def set_server_specification(request):
     name = request.matchdict['name']
     vm_id = server.get_server_id_from_name(name)
-    
+
     # Filter for bad requests
-    
-    if (request.POST['cores'] not in ['1','2','4','16']) or (request.POST['ram'] not in ['1','4','8','16','500']):
+
+    if (request.POST['cores'] not in ['1', '2', '4', '16']) or (request.POST['ram'] not in ['1', '4', '8', '16', '500']):
         return HTTPBadRequest()
     else:
         server.touch_to_add_specification(vm_id, request.POST['cores'], request.POST['ram'])
@@ -404,7 +406,7 @@ def get_server_specification(request):
     name = request.matchdict['name']
     vm_id = server.get_server_id_from_name(name)
     cores, ram = server.get_latest_specification(vm_id)
-    return {"cores":cores,"ram":ram}
+    return {"cores":cores, "ram":ram}
 
 
 
