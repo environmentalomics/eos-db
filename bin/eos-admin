@@ -1,4 +1,4 @@
-#!python
+#!python3
 
 """EOS Admin - Administrator Actions for EOS Cloud
 
@@ -18,7 +18,7 @@ eos-admin changepwd <username> <password> :
 
 """
 
-from __future__ import absolute_import, division, print_function
+#TODO - make this talk to the server via the web API
 import sys
 from eos_db import server
 
@@ -73,7 +73,7 @@ elif arg[0] == 'addcredit':
     try:
         username = arg[1]
         credit = int(arg[2])
-    except IndexError, ValueError:
+    except (IndexError, ValueError):
         print ("Specify a user name and integer credit amount.")
         sys.exit()
 
