@@ -1,7 +1,6 @@
 """Tests for DB API behaviour when logged in as administrator
 
 """
-
 import unittest, json
 from eos_db import server
 from webtest import TestApp
@@ -104,13 +103,13 @@ class TestVMAPI(unittest.TestCase):
 
         !! Not implemented."""
         self.create_user("testuser")
-
+        print (current_state)
         response = self.app.delete('/users/testuser2',
                                    status=501,
                                    expect_errors=False)
 
 
-    def test_create_check_user_password(self): # FIX
+    def test_create_check_user_password(self):  # FIX
         """ Apply a password to a user. Check that we receive a 200 OK.
         Validate against the database with the user and password above.
         We should receive an access token."""
@@ -148,9 +147,9 @@ class TestVMAPI(unittest.TestCase):
                                 {'actor_id': 'testuser'},
                                 status=200,
                                 expect_errors=False)
-        assert json.loads(json.loads(response.text))['credit_balance'] == 1000 #?? double encoded
+        assert json.loads(json.loads(response.text))['credit_balance'] == 1000  # ?? double encoded
 
-    def test_create_own_retrieve_servers(self): #FIX
+    def test_create_own_retrieve_servers(self):  # FIX
         """ Create a server. Ensure that a 200 OK response results.
         Add an owner to a server. Ensure that a 200 OK response results.
         A user can request a list of servers that they own. An
@@ -183,17 +182,17 @@ class TestVMAPI(unittest.TestCase):
                                 status=501,
                                 expect_errors=False)
 
-        assert json.loads(json.loads(response.text))['credit_balance'] == 1000 #?? double encoded
+        assert json.loads(json.loads(response.text))['credit_balance'] == 1000  # ?? double encoded
 
     """ Server State-Change Functions. """
 
-    def test_server_states(self): #FIX
+    def test_server_states(self):  # FIX
         """ Check that a server appears in various states after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
         def push_to_state(state):
-            response = self.app.post('/servers/testserver/'+state,
+            response = self.app.post('/servers/testserver/' + state,
                             {'vm_id': 'testserver',
                              'eos_token': 'TOKEN'},
                             status=200,
@@ -219,7 +218,7 @@ class TestVMAPI(unittest.TestCase):
     def test_retrieve_server(self):
         """ Pull back details of our server by name. """
 
-        self.create_server("testserver") # Create server
+        self.create_server("testserver")  # Create server
 
         # Retrieve server details
 
@@ -232,7 +231,7 @@ class TestVMAPI(unittest.TestCase):
         """ Our server will have ID 1. Check that we can retrieve details of
         it."""
 
-        self.create_server("testserver") # Create server
+        self.create_server("testserver")  # Create server
 
         # Retrieve server details by name
 
@@ -243,7 +242,7 @@ class TestVMAPI(unittest.TestCase):
     def test_update_server(self):
         """ Not currently implemented. """
 
-        self.create_server("testserver") # Create server
+        self.create_server("testserver")  # Create server
 
         # Update server details
 
@@ -260,7 +259,7 @@ class TestVMAPI(unittest.TestCase):
         Set machine RAM to 65000. Check, should fail.
         Check that machine RAM and Cores are 2 and 16 as above. """
 
-        self.create_server("testserver") # Create server
+        self.create_server("testserver")  # Create server
 
         # Set server spec
 
@@ -298,7 +297,7 @@ class TestVMAPI(unittest.TestCase):
 ###############################################################################
 
     def create_user(self, name):
-        response = self.app.put('/users/'+name,
+        response = self.app.put('/users/' + name,
                                 {'type': name,
                                 'handle': name,
                                 'name': name,
@@ -307,7 +306,7 @@ class TestVMAPI(unittest.TestCase):
                                 expect_errors=False)
 
     def create_server(self, name):
-        response = self.app.put('/servers/'+name,
+        response = self.app.put('/servers/' + name,
                                 {'hostname': name,
                                  'uuid': name },
                                 status=200,

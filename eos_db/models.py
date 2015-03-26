@@ -78,7 +78,7 @@ class User(Actor):
 
     __mapper_args__ = {"polymorphic_identity": "user"}
 
-    #def __repr__(self):
+    # def __repr__(self):
     #    return "<User(username='%s')>" % self.username
 
 ##############################################################################
@@ -91,7 +91,7 @@ class Artifact(Base):
     __tablename__ = 'artifact'
 
     id = Column(Integer, primary_key=True)
-    uuid = Column("uuid", CHAR(length=32), nullable=False)
+    uuid = Column("uuid", CHAR(length=40), nullable=False)
     name = Column("name", CHAR(length=32), nullable=False)
     type = Column("type", String(length=32), nullable=False)
 
@@ -167,7 +167,7 @@ class ArtifactState(State):
                 nullable=False, primary_key=True)
 
     __mapper_args__ = {"polymorphic_identity": "artifactstate"}
-    #__table_args__ = (CheckConstraint(State.name in ['Stopped', 'Starting', 'Started',
+    # __table_args__ = (CheckConstraint(State.name in ['Stopped', 'Starting', 'Started',
     #                                           'Boosting', 'Boosted','Deboosting',
     #                                           'Suspending', 'Suspended', 'Stopping']),)
 
@@ -242,21 +242,21 @@ class Password(Resource):
 
     id = Column("id", Integer, ForeignKey("resource.id"),
                 nullable=False, primary_key=True)
-    password = Column("password", String(length=64), nullable=False)
+    password = Column("password", String(length=128), nullable=False)
 
     __mapper_args__ = {"polymorphic_identity": "password"}
 
     def __init__(self, **kwargs):
-        #Crypt it
-        kwargs['password'] = hashpw(str(kwargs['password']).encode(), gensalt())
-        super(self.__class__,self).__init__(**kwargs)
+        # Crypt it
+        kwargs['password'] = hashpw(kwargs['password'].encode(), gensalt()).decode()
+        super(self.__class__, self).__init__(**kwargs)
 
     def check(self, candidate):
         """Checks if a candidate password matches the stored crypt-ed password.
            Caller should use this rather than attempting manual comparison.
         """
         # This only works on Py3!
-        return self.password == hashpw(str(candidate).encode(), self.password)
+        return self.password.encode() == hashpw(candidate.encode(), self.password.encode())
 
 class Credit(Resource):
     """Represents the addition or subtraction of credit from the user's account.
@@ -287,7 +287,7 @@ class SessionKey(Resource):
     """ Primary key. """
 
     session_key = Column("session_key", String(length=64), nullable=False)
-    
+
     __mapper_args__ = {"polymorphic_identity": "sessionkey"}
 
 class Specification(Resource):
