@@ -8,6 +8,8 @@ from webtest import TestApp
 # is ported.
 from pyramid.paster import get_app
 
+from eos_db import server
+
 class TestUnAuth(unittest.TestCase):
     """Tests to see that the server responds as expected to non-authorized requests.
     """
@@ -41,6 +43,31 @@ class TestUnAuth(unittest.TestCase):
            to log in.
         """
         app = self.testapp
+
+        response = app.get('/servers', status=401)
+
+        self.assertEqual(response.headers.get('WWW-Authenticate', 'empty'), 'Basic realm="eos_db"')
+
+    def test_servers_baduser(self):
+        """If I ask for a list of servers, and give a wrong username+password, I
+           should get back a 403
+        """
+        app = self.testapp
+        app.authorization = ('Basic', ('baduser', 'badpassword'))
+
+        response = app.get('/servers', status=401)
+
+        self.assertEqual(response.headers.get('WWW-Authenticate', 'empty'), 'Basic realm="eos_db"')
+
+    def test_servers_badpass(self):
+        """Likewise if I give a valid user name but no password
+        """
+        server.create_user("user", "administrator", "administrator", "administrator")
+        server.touch_to_add_user_group("administrator", "administrators")
+        server.touch_to_add_password(1, "adminpass")
+
+        app = self.testapp
+        app.authorization = ('Basic', ('administrator', 'badpassword'))
 
         response = app.get('/servers', status=401)
 
