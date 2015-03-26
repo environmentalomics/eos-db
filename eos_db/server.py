@@ -42,11 +42,11 @@ def choose_engine(enginestring):
         if DB and DB.username:
             # Password auth
             engine = create_engine('postgresql://%s:%s@%s/%s'
-                                   % ( DB.username, DB.password, DB.host, DB.database ),
+                                   % (DB.username, DB.password, DB.host, DB.database),
                                    echo=True)
         elif DB:
             engine = create_engine('postgresql:///%s'
-                                   % ( DB.database ),
+                                   % (DB.database),
                                    echo=True)
         else:
             engine = create_engine('postgresql:///eos_db', echo=True)
@@ -76,7 +76,7 @@ def deploy_tables():
 
 def setup_states(state_list):
     for state in state_list:
-        _create_artifact_state(state) # Make sure states must be distinct
+        _create_artifact_state(state)  # Make sure states must be distinct
 
 ##############################################################################
 
@@ -168,7 +168,7 @@ def list_artifacts_for_user(user_id):
     return artifacts
 
 def return_artifact_details(artifact_id):
-    artifact_name  = get_server_name_from_id(artifact_id)[0]
+    artifact_name = get_server_name_from_id(artifact_id)[0]
     change_dt = _get_most_recent_change(artifact_id)
     create_dt = _get_artifact_creation_date(artifact_id)
     state = _get_most_recent_artifact_state(artifact_id)
@@ -201,7 +201,7 @@ def return_artifact_details(artifact_id):
 
 def set_deboost(hours, touch_id):
     deboost_dt = datetime.now()
-    deboost_dt += timedelta(hours = hours)
+    deboost_dt += timedelta(hours=hours)
     new_deboost = Deboost(deboost_dt=deboost_dt, touch_id=touch_id)
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
@@ -211,31 +211,31 @@ def set_deboost(hours, touch_id):
 def list_servers_in_state(state):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    servers = session.query(Artifact.uuid).filter(Touch.artifact_id==Artifact.id).filter(Touch.state_id==State.id).filter_by(name=state).all()
+    servers = session.query(Artifact.uuid).filter(Touch.artifact_id == Artifact.id).filter(Touch.state_id == State.id).filter_by(name=state).all()
     result = {}
     for server in servers:
-        result[server[3]] = ({"user_id": server[0],"touch_id": server[1],"artifact_id": server[2]})
+        result[server[3]] = ({"user_id": server[0], "touch_id": server[1], "artifact_id": server[2]})
     session.close()
     return result
 
 def get_server_name_from_id(artifact_id):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    artifact_name  = session.query(Artifact.uuid).filter(Artifact.id == artifact_id).first()
+    artifact_name = session.query(Artifact.uuid).filter(Artifact.id == artifact_id).first()
     session.close()
     return artifact_name
 
 def get_server_id_from_name(name):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    artifact_id  = session.query(Artifact.id).filter(Artifact.uuid == name).first()[0]
+    artifact_id = session.query(Artifact.id).filter(Artifact.uuid == name).first()[0]
     session.close()
     return artifact_id
 
 def get_user_id_from_name(name):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    user_id  = session.query(User.id).filter(User.handle == name).first()[0]
+    user_id = session.query(User.id).filter(User.handle == name).first()[0]
     session.close()
     return user_id
 
@@ -277,12 +277,12 @@ def list_server_in_state(state):
     for server in servers:
         if _get_most_recent_artifact_state(server[0])[0] == state:
             stated_server = server[0]
-    session.close() 
+    session.close()
     return stated_server
 
 def touch_to_add_ownership(artifact_id, user_id):
-    touch_id=_create_touch(None, artifact_id, None)
-    ownership_id=create_ownership(touch_id, user_id)
+    touch_id = _create_touch(None, artifact_id, None)
+    ownership_id = create_ownership(touch_id, user_id)
     return ownership_id
 
 ##############################################################################
@@ -296,8 +296,8 @@ def get_server_uuid_by_id(id):
 ##############################################################################
 
 def touch_to_add_session_key(userid, session_key):
-    touch_id=_create_touch(get_user_id_from_name(userid), None, None)
-    session_id=create_session_key(touch_id, session_key)
+    touch_id = _create_touch(get_user_id_from_name(userid), None, None)
+    session_id = create_session_key(touch_id, session_key)
     return session_id
 
 def create_session_key(touch_id, session_key):
@@ -311,14 +311,14 @@ def create_session_key(touch_id, session_key):
 
 def check_token(token, artifact_id):
     """Check if artifact belongs to owner of token"""
-    #token_actor_id = get_token_owner(token)
-    #return check_ownership(artifact_id, token_actor_id)
+    # token_actor_id = get_token_owner(token)
+    # return check_ownership(artifact_id, token_actor_id)
     return True
 
 def check_ownership(artifact_id, actor_id):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    our_ownership = session.query(Ownership).filter(Ownership.touch_id==Touch.id).filter(Touch.actor_id==Actor.id).filter(Actor.handle==actor_id).order_by(Touch.id.desc()).first()
+    our_ownership = session.query(Ownership).filter(Ownership.touch_id == Touch.id).filter(Touch.actor_id == Actor.id).filter(Actor.handle == actor_id).order_by(Touch.id.desc()).first()
     session.close()
     if our_ownership is None:
         return False
@@ -350,8 +350,8 @@ def touch_to_state(artifact_id, state_name):
     :param state_name: Target state name, which will be mapped to an ID for us.
     :returns: touch ID
     """
-    #Supplying an invalid state will trigger an exception here.
-    #Ensure the states were properly loaded in the DB.
+    # Supplying an invalid state will trigger an exception here.
+    # Ensure the states were properly loaded in the DB.
     state_id = get_state_id_by_name(state_name)
     touch_id = _create_touch(None, artifact_id, state_id)
     return touch_id
@@ -434,7 +434,7 @@ def get_latest_deboost_dt(vm_id):
 def get_hours_until_deboost(vm_id):
     now = datetime.now()
     deboost_dt = get_latest_deboost_dt(vm_id)[0]
-    d = deboost_dt-now
+    d = deboost_dt - now
     return int(d.total_seconds() / 3600)
 
 def get_previous_specification(vm_id, index):
@@ -515,10 +515,11 @@ def create_ownership(touch_id, user_id):
 def check_password(actor_id, password):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    our_password = session.query(Password).filter(Password.touch_id==Touch.
-id).filter(Touch.actor_id==Actor.id).filter(Actor.handle==actor_id).order_by(Touch.id.desc()).first()
+    our_password = session.query(Password).filter(Password.touch_id == Touch.
+id).filter(Touch.actor_id == Actor.id).filter(Actor.handle == actor_id).order_by(Touch.id.desc()).first()
     session.close()
-    
+    print (actor_id)
+    print (password)
     return our_password.check(str(password))
 
 def _create_credit(touch_id, credit):
@@ -564,7 +565,7 @@ def check_credit(actor_id):
 
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    credit = session.query(func.sum(Credit.credit)).filter(Credit.touch_id==Touch.id).filter(Touch.actor_id==Actor.id).filter(Actor.handle==actor_id).scalar()
+    credit = session.query(func.sum(Credit.credit)).filter(Credit.touch_id == Touch.id).filter(Touch.actor_id == Actor.id).filter(Actor.handle == actor_id).scalar()
 
     session.close()
     return credit
@@ -577,7 +578,7 @@ def check_actor_id(actor_id):
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    if session.query(Actor).filter(Actor.handle==actor_id).count() > 0:
+    if session.query(Actor).filter(Actor.handle == actor_id).count() > 0:
         session.close()
         return True
     else:

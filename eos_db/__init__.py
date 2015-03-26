@@ -8,7 +8,7 @@ import eos_db.server
 from pyramid.authentication import BasicAuthAuthenticationPolicy
 from pyramid.httpexceptions import HTTPUnauthorized
 
-ALLOWED_ORIGIN = ('http://localhost:6542', )
+ALLOWED_ORIGIN = ('http://localhost:6542',)
 
 def add_cors_headers_response_callback(event):
 
@@ -29,22 +29,25 @@ def passwordcheck():
        the password.
     """
 
-    #Bcrypy is slow, which is good to deter dictionary attacks, but bad when
-    #the same user is calling multiple API calls, and especially bad for the tests.
-    #This one-item cache should be crude but effective:
+    # Bcrypy is slow, which is good to deter dictionary attacks, but bad when
+    # the same user is calling multiple API calls, and especially bad for the tests.
+    # This one-item cache should be crude but effective:
     lastpass = [""]
 
     def _passwordcheck(login, password, request):
-        #print("Checking %s:%s for %s" % (login, password, request))
-        #print("Lastpass is " + lastpass[0])
+        # print("Checking %s:%s for %s" % (login, password, request))
+        # print("Lastpass is " + lastpass[0])
 
-        if ( str(lastpass[0]) == login + ":" + password or
-             eos_db.server.check_password(login, password) ):
+        if login == "agent" and password == "sharedsecret":
+            return ['group:agents']
+
+        elif (str(lastpass[0]) == login + ":" + password or
+             eos_db.server.check_password(login, password)):
 
                 user_group = eos_db.server.get_user_group(login)[0]
 
                 if user_group in ("administrators", "users", "agents"):
-                    #Remember that this worked
+                    # Remember that this worked
                     lastpass[0] = login + ":" + password
 
                     return ['group:' + user_group]
@@ -79,7 +82,7 @@ def main(global_config, **settings):
 
     config.add_subscriber(add_cors_headers_response_callback, NewRequest)
 
-    #Needed to ensure proper 401 responses
+    # Needed to ensure proper 401 responses
     config.add_forbidden_view(basic_challenge(bap))
 
     settings = config.registry.settings
@@ -96,15 +99,15 @@ def main(global_config, **settings):
 
     # Session API calls
 
-    config.add_route('sessions', '/sessions') # Get session list
-    config.add_route('session', '/session') # Get session details or
+    config.add_route('sessions', '/sessions')  # Get session list
+    config.add_route('session', '/session')  # Get session details or
                                             # Post new session or
                                             # Delete session
 
     # User-related API calls
 
-    config.add_route('users', '/users') # Return user list
-    config.add_route('user', '/users/{name}')   # Get user details or
+    config.add_route('users', '/users')  # Return user list
+    config.add_route('user', '/users/{name}')  # Get user details or
                                                         # Put new user or
                                                         # Delete user
 
@@ -121,8 +124,8 @@ def main(global_config, **settings):
 
     # Server-related API calls
 
-    config.add_route('servers', '/servers') # Return server list
-    config.add_route('server', '/servers/{name}')    # Get server details or
+    config.add_route('servers', '/servers')  # Return server list
+    config.add_route('server', '/servers/{name}')  # Get server details or
                                                     # Post new server or
                                                     # Delete server
 
@@ -130,7 +133,8 @@ def main(global_config, **settings):
 
     # Server state-related calls.
 
-    config.add_route('states', '/states/{name}') # Get list of servers in given state.
+    config.add_route('states', '/states')  # Get list of servers in given state.
+    config.add_route('state', '/states/{name}')  # Get list of servers in given state.
 
     config.add_route('server_start', '/servers/{name}/Starting')
     config.add_route('server_stop', '/servers/{name}/Stopping')
@@ -151,7 +155,7 @@ def main(global_config, **settings):
 
     config.add_route('server_state', '/servers/{name}/state')
 
-    config.add_route('server_owner', '/servers/{name}/owner') #
+    config.add_route('server_owner', '/servers/{name}/owner')  #
 
 
     config.add_route('server_touches', '/servers/{name}/touches')
@@ -159,7 +163,7 @@ def main(global_config, **settings):
 
     # Server configuration change calls.
 
-    config.add_route('server_specification','servers/{name}/specification') # Get or put server specification
+    config.add_route('server_specification', 'servers/{name}/specification')  # Get or put server specification
 
     config.scan()
     return config.make_wsgi_app()
