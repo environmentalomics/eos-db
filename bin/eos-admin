@@ -1,35 +1,95 @@
 #!python3
 
+blurb = \
 """EOS Admin - Administrator Actions for EOS Cloud
 
 Permissible instructions:
 
-eos-admin adduser <username> <password> :
+eos-admin adduser <username> <password> [realname]:
     Add a user with the specified password.
 
-eos-admin addvm <username> <server_name> <server_uuid> :
+eos-admin addvm <username> [server_name [server_uuid]] :
     Add a particular server to a user's account.
 
 eos-admin addcredit <username> <credit> :
     Add credit to a user. Negative amounts deduct credit.
 
-eos-admin changepwd <username> <password> :
+eos-admin changepwd <username> [password] :
     Change a user's password.
 
 """
 
-#TODO - make this talk to the server via the web API
+# Removing server ownership needs some thought.
+
+#TODO - make this talk to the server via the web API, not via direct
+# instantiation.
 import sys
+from getpass import getpass
+from traceback import print_exc
 from eos_db import server
 
 arg = sys.argv[1:]
 
 if len(arg) == 0:
-    print ('No arguments provided. Type "eos-admin help" for more info.')
-    sys.exit()
+    arg = ("help",)
 
-# This only works with PostgreSQL??
+# This only works with PostgreSQL??  Yes, because SQLite in-memory DB
+# will vanish as soon as the program quits.
 server.choose_engine("PostgreSQL")
+
+def by_user_getter(username):
+    """Returns a pairs of (machine_name, machine_id) for this user
+    """
+    sess = get_vcd_session()
+
+    #The call should throw an exception if lookup fails.
+    vapps = list(sess.get_all_vms_for_user(username))
+
+    sess.kill()
+
+    return vapps
+
+def uuid_getter(machine_name):
+
+    sess = get_vcd_session()
+
+    #The call should throw an exception if lookup fails.
+    uuid = sess.get_vm_uid_from_name(machine_name)
+
+    sess.kill()
+
+    return (( machine_name, uuid ),)
+
+def get_vcd_session():
+
+    print("Attempting to connect to vCloud Director.")
+    print("This requires the eos_agents module to be installed.")
+
+    from eos_agents import vc_client
+
+    conn_args = ['', '', '', '']
+    try:
+        from eos_agents import settings
+
+        conn_args = [ settings.VCDetails.username,
+                      settings.VCDetails.password,
+                      settings.VCDetails.org,
+                      settings.VCDetails.endpoint ]
+    except:
+        pass
+
+    conn_args[3] = input("Endpoint [%a]: " % conn_args[3]) or conn_args[3]
+    conn_args[2] = input("Org [%a]: " % conn_args[2]) or conn_args[2]
+    resp = input("User [%a]: " % conn_args[0])
+    if resp:
+        conn_args[0] = resp
+        conn_args[1] = '' #forget the password if the user is changed
+    resp = getpass("Password [%s]: " % ('****' if len(conn_args[1]) else 'none'))
+    if resp:
+        conn_args[1] = resp
+
+
+    return vc_client.VCSession(*conn_args)
 
 if arg[0] == 'adduser':
     print ("Adding user...")
@@ -37,35 +97,55 @@ if arg[0] == 'adduser':
     try:
         username = arg[1]
         password = arg[2]
-        realname = arg[3] if len(arg) >= 4 else username
+        realname = arg[3] if arg[3:] else username
     except IndexError:
-        print ("Ensure you enter a username and password.")
-        sys.exit()
+        sys.exit("Ensure you enter a username and password.")
 
     id = server.create_user("user", username, realname, username)
     print ("New user created with id %s" % id)
     server.touch_to_add_password(id, password)
+
+    #Sanity check...
+    if server.check_password(username, password):
+        print("User %s password set." % (username))
+    else:
+        print("Failed to set the password!")
 
 elif arg[0] == 'addvm':
     print ("Adding vm...")
 
     try:
         username = arg[1]
-        machine_name = arg[2]
-        machine_uuid = arg[3]
     except IndexError:
-        print ("Ensure you enter a username, machine name, and UUID.")
-        sys.exit()
+        sys.exit("Ensure you enter at least a username.")
 
-    id = server.create_appliance(machine_name, machine_uuid)
     try:
         user_id = server.get_user_id_from_name(username)
     except TypeError:
-        print("No such user.")
-        sys.exit()
-    id = server.touch_to_add_ownership(id, user_id)
-    print ("New server created with id %s" % id)
-    print ("New server ownership added to user id %s" % user_id)
+        sys.exit("No such user.")
+
+
+    if not arg[2:]:
+        try:
+            to_add = by_user_getter(username)
+        except:
+            print_exc()
+            sys.exit("Can't determine machines owned by %s." % username)
+    elif not arg[3:]:
+        try:
+            to_add = uuid_getter(arg[2])
+        except:
+            print_exc()
+            sys.exit("Can't determine machine UUID matching %s." % arg[2])
+    else:
+        to_add = (arg[2:4],)
+
+    for mname, muuid in to_add:
+        id1 = server.create_appliance(mname, muuid)
+        id2 = server.touch_to_add_ownership(id1, user_id)
+
+        print ("New server created with id %s" % id1)
+        print ("New server ownership added to user id %s" % user_id)
 
 elif arg[0] == 'addcredit':
     print ("Adding credit...")
@@ -74,14 +154,12 @@ elif arg[0] == 'addcredit':
         username = arg[1]
         credit = int(arg[2])
     except (IndexError, ValueError):
-        print ("Specify a user name and integer credit amount.")
-        sys.exit()
+        sys.exit("Specify a user name and integer credit amount.")
 
     try:
         user_id = server.get_user_id_from_name(username)
     except TypeError:
-        print("No such user.")
-        sys.exit()
+        sys.exit("No such user.")
     server.touch_to_add_credit(user_id, credit)
 
     #For some reason this call needs the username, not the ID.
@@ -93,16 +171,21 @@ elif arg[0] == 'changepwd':
 
     try:
         username = arg[1]
-        password = arg[2]
+        password = arg[2] if arg[2:] else None
     except IndexError:
-        print ("No username or password specified.")
-        sys.exit()
+        sys.exit("No username or password specified.")
 
     try:
         user_id = server.get_user_id_from_name(username)
     except TypeError:
-        print("No such user.")
-        sys.exit()
+        sys.exit("No such user.")
+
+    if password is None:
+        password = getpass("Password: ")
+        passagain = getpass("And again: ")
+        if passagain != password:
+            sys.exit("Passwords do not match")
+
     pwd = server.touch_to_add_password(user_id, password)
 
     #Sanity check...
@@ -112,23 +195,4 @@ elif arg[0] == 'changepwd':
         print("Failed to set the password!")
 
 else:
-    print ("""
-EOS Admin - Administrator Actions for EOS Cloud
------------------------------------------------
-
-    Permissible instructions:
-
-    eos-admin help
-        Display this help.
-
-    eos-admin adduser <username> <password>
-        Add a user with the specified password.
-
-    eos-admin addvm <username> <server_name> <server_uuid>
-        Add a particular server to a user's account.
-
-    eos-admin addcredit <username> <credit>
-        Add credit to a user. Negative amounts deduct credit.
-
-    eos-admin changepwd <username> <password>
-        Change a user's password.""")
+    print (blurb)
