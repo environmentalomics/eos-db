@@ -1,11 +1,12 @@
 from pyramid.config import Configurator
-from pyramid.events import NewRequest
+from pyramid.events import NewRequest, NewResponse
+from pyramid.security import authenticated_userid, remember
 
 import logging
 import os
 import eos_db.server
 
-from pyramid.authentication import BasicAuthAuthenticationPolicy
+from eos_db.hybridauth import HybridAuthenticationPolicy
 from pyramid.httpexceptions import HTTPUnauthorized
 
 ALLOWED_ORIGIN = ('http://localhost:6542',)
@@ -25,8 +26,16 @@ def add_cors_headers_response_callback(event):
 
     event.request.add_response_callback(cors_headers)
 
+def add_test_callback(event):
+
+    def test_callback(request, response):
+        if response.status[0] == '2':
+            print (remember(request, request.authenticated_userid))
+            response.headers.update(remember(request, request.authenticated_userid))
+    event.request.add_response_callback(test_callback)
+
 def passwordcheck():
-    """Generates a callback supplied to BasicAuthAuthenticationPolicy to check
+    """Generates a callback supplied to HybridAuthenticationPolicy to check
        the password.
     """
 
@@ -36,8 +45,10 @@ def passwordcheck():
     lastpass = [""]
 
     def _passwordcheck(login, password, request):
-        # print("Checking %s:%s for %s" % (login, password, request))
-        # print("Lastpass is " + lastpass[0])
+        print("Checking %s:%s for %s" % (login, password, request))
+        print("Lastpass is " + lastpass[0])
+
+        print ('Password Check' + login + password)
 
         if login == "agent" and password == "sharedsecret":
             return ['group:agents']
@@ -61,30 +72,18 @@ def passwordcheck():
 
     return _passwordcheck
 
-def basic_challenge(basicauthpolicy):
-    """Fire a 401 when authentication needed
-       The reason for capturing the BasicAuthAuthenticationPolicy in a closure
-       is because it knows the right realm and thus will generate the right headers.
-    """
-
-    def _basic_challenge(request):
-        response = HTTPUnauthorized()
-        response.headers.update(basicauthpolicy.forget(request))
-        return response
-
-    return _basic_challenge
-
 def main(global_config, **settings):
 
-    bap = BasicAuthAuthenticationPolicy(check=passwordcheck(), realm="eos_db")
+    hap = HybridAuthenticationPolicy(check=passwordcheck(), secret="Spanner", realm="eos_db")
     config = Configurator(settings=settings,
-                          authentication_policy=bap,
+                          authentication_policy=hap,
                           root_factory='eos_db.models.RootFactory')
 
     config.add_subscriber(add_cors_headers_response_callback, NewRequest)
+    config.add_subscriber(add_test_callback, NewRequest)
 
     # Needed to ensure proper 401 responses
-    config.add_forbidden_view(basic_challenge(bap))
+    config.add_forbidden_view(hap.get_forbidden_view)
 
     settings = config.registry.settings
     server.choose_engine(settings['server'])
@@ -153,6 +152,8 @@ def main(global_config, **settings):
 
     config.add_route('server_boost', '/servers/{name}/Boosting')
     config.add_route('server_boosted', '/servers/{name}/Boosted')
+
+    config.add_route('server_error', '/servers/{name}/Error')
 
     config.add_route('server_state', '/servers/{name}/state')
 

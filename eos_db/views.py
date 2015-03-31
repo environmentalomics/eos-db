@@ -11,7 +11,7 @@ import json, uuid, bcrypt
 
 from pyramid.response import Response
 from pyramid.view import view_config
-from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented, HTTPUnauthorized, HTTPForbidden
+from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented, HTTPUnauthorized, HTTPForbidden, HTTPNotFound
 import hashlib, base64, random
 from eos_db import server
 
@@ -61,6 +61,11 @@ def home_view(request):
 @view_config(request_method="OPTIONS", route_name='servers', renderer='json')
 @view_config(request_method="OPTIONS", route_name='server_start', renderer='json')
 @view_config(request_method="OPTIONS", route_name='server_stop', renderer='json')
+@view_config(request_method="OPTIONS", route_name='server_restart', renderer='json')
+@view_config(request_method="OPTIONS", route_name='server_pre_deboost', renderer='json')
+@view_config(request_method="OPTIONS", route_name='server_prepare', renderer='json')
+@view_config(request_method="OPTIONS", route_name='server_specification', renderer='json')
+
 def options(request):
     return None
 
@@ -97,7 +102,7 @@ def retrieve_users(request):
 
 @view_config(request_method="PUT", route_name='user', renderer='json', permission="use")
 def create_user(request):
-    newname = server.create_user(request.POST['type'], request.POST['handle'], request.POST['name'], request.POST['username'])
+    newname = server.create_user(request.POST['type'], request.POST['handle'], request.POST['name'], request.matchdict['name'])
     return newname
 
 @view_config(request_method="GET", route_name='user', renderer='json', permission="use")
@@ -106,10 +111,11 @@ def retrieve_user(request):
     :param actor_id: The user we are interested in.
     :returns JSON object containing user table data and credit balance.
     """
-    actor_id = request.GET['actor_id']
-    if server.check_actor_id(actor_id) == False:
+    username = request.matchdict['name']
+    actor_id = server.get_user_id_from_name(username)
+    if server.check_actor_id(username) == False:
         return HTTPForbidden()
-    details = server.check_user_details(actor_id)
+    details = server.check_user_details(username)
     details['credits'] = server.check_credit(actor_id)
     return json.dumps(details)
 
@@ -125,19 +131,25 @@ def delete_user(request):
 
 # User password actions
 
-@view_config(request_method="PUT", route_name='user_password', renderer='json', permission="use")
+@view_config(request_method="PUT", route_name='user_password', renderer='json', permission="administer")
 def create_user_password(request):
     # Add salt and hash
-    newname = server.touch_to_add_password(request.POST['actor_id'], request.POST['password'])
+    username = request.matchdict['name']
+    actor_id = server.get_user_id_from_name(username)
+    newname = server.touch_to_add_password(actor_id, request.POST['password'])
     return newname
 
-@view_config(request_method="GET", route_name='user_password', renderer='json', permission="token")
+@view_config(request_method="GET", route_name='user_password', renderer='json', permission="use")
 def retrieve_user_password(request):
-    # Add salt and hash
-    verify = server.check_password(request.GET['actor_id'], request.GET['password'])
+    username = request.matchdict['name']
+    actor_id = server.get_user_id_from_name(username)
+    print (username)
+    print (request.GET['password'])
+    verify = server.check_password(username, request.GET['password'])
+    print (verify)
     if verify == True:
         key = str(uuid.UUID(bytes=bcrypt.gensalt()[8:24]))
-        server.touch_to_add_session_key(request.GET['actor_id'], key)
+        server.touch_to_add_session_key(actor_id, key)
         return key
     else:
         response = HTTPUnauthorized()
@@ -162,7 +174,7 @@ def create_user_credit(request):
 
     :returns: JSON containing actor id, credit change and new balance.
     """
-    actor_id, credit = request.POST['actor_id'], request.POST['credit']
+    actor_id, credit = request.matchdict['name'], request.POST['credit']
     if credit.lstrip('-').isdigit() == False:
         return HTTPBadRequest()
     if server.check_actor_id(actor_id) == False:
@@ -182,10 +194,11 @@ def retrieve_user_credit(request):
     :param actor_id: Actor/user id for which we are checking credit.
     :returns: JSON containing actor_id and current balance.
     """
-    actor_id = request.GET['actor_id']
-    if server.check_actor_id(actor_id) == False:
+    username = request.matchdict['name']
+    actor_id = server.get_user_id_from_name(username)
+    if server.check_actor_id(username) == False:
         return HTTPNotFound()
-    credits = server.check_credit(actor_id)
+    credits = server.check_credit(username)
     output = json.dumps({'actor_id': actor_id,
                          'credit_balance': int(credits)}, sort_keys=True)
     return output
@@ -194,12 +207,12 @@ def retrieve_user_credit(request):
 
 # Server-related API calls - All Servers
 
-@view_config(request_method="GET", route_name='servers', renderer='json', permission="token")
+@view_config(request_method="GET", route_name='servers', renderer='json', permission="use")
 def retrieve_servers(request):
     server_list = server.list_artifacts_for_user(request.GET['actor_id'])
     return server_list
 
-@view_config(request_method="GET", route_name='state', renderer='json', permission="token")
+@view_config(request_method="GET", route_name='state', renderer='json', permission="use")
 def retrieve_servers_in_state(request):
     server_id = server.list_server_in_state(request.GET['state'])
     server_uuid = server.get_server_uuid_by_id(server_id)
@@ -209,7 +222,7 @@ def retrieve_servers_in_state(request):
 
 @view_config(request_method="PUT", route_name='server', renderer='json', permission="use")
 def create_server(request):
-    newname = server.create_appliance(request.POST['hostname'], request.POST['uuid'])
+    newname = server.create_appliance(request.matchdict['name'], request.POST['uuid'])
     return newname
 
 @view_config(request_method="GET", route_name='server', renderer='json', permission="use")
@@ -237,46 +250,46 @@ def delete_server(request):
 
 @view_config(request_method="PUT", route_name='server_owner', renderer='json', permission="use")
 def create_server_owner(request):
-    newname = server.touch_to_add_ownership(request.POST['artifact_id'], request.POST['actor_id'])
+    newname = server.touch_to_add_ownership(request.matchdict['name'], request.POST['actor_id'])
     return newname
 
 @view_config(request_method="GET", route_name='server_owner', renderer='json', permission="use")
 def get_server_owner(request):
-    return HTTPNotImplemented
+    return HTTPNotImplemented()
 
 # State changes
 
-@view_config(request_method="POST", route_name='server_start', renderer='json', permission="token")
+@view_config(request_method="POST", route_name='server_start', renderer='json', permission="use")
 def start_server(request):
     """Put a server into the "pre-start" status.
 
     :param vm_id: ID of VApp which we want to start.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    if server.check_token(request.headers['eos_token'], request.POST['vm_id']):
-        newname = server.touch_to_state(request.POST['vm_id'], "Starting")
+    if server.check_token(request.headers['eos_token'], request.matchdict['name']):
+        newname = server.touch_to_state(request.matchdict['name'], "Starting")
         return newname
     else:
         return HTTPUnauthorized
 
-@view_config(request_method="POST", route_name='server_restart', renderer='json', permission="token")
+@view_config(request_method="POST", route_name='server_restart', renderer='json', permission="use")
 def restart_server(request):
     """Put a server into the "restart" status.
 
     :param vm_id: ID of VApp which we want to start.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    touch_id = server.touch_to_state(request.POST['vm_id'], "Restarting")
+    touch_id = server.touch_to_state(request.matchdict['name'], "Restarting")
     return touch_id
 
-@view_config(request_method="POST", route_name='server_stop', renderer='json', permission="token")
+@view_config(request_method="POST", route_name='server_stop', renderer='json', permission="use")
 def stop_server(request):
     """Put a server into the "pre-stop" status.
 
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    touch_id = server.touch_to_state(request.POST['vm_id'], "Stopping")
+    touch_id = server.touch_to_state(request.matchdict['name'], "Stopping")
     return touch_id
 
 @view_config(request_method="POST", route_name='server_prepare', renderer='json', permission="use")
@@ -286,7 +299,7 @@ def prepare_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    touch_id = server.touch_to_state(request.POST['vm_id'], "Preparing")
+    touch_id = server.touch_to_state(request.matchdict['name'], "Preparing")
     return touch_id
 
 @view_config(request_method="GET", route_name='server_state', renderer='json', permission="use")
@@ -296,7 +309,7 @@ def server_state(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    id = server.get_server_id_from_name(request.GET['artifact_id'])
+    id = server.get_server_id_from_name(request.matchdict['name'])
     newname = server.check_state(id)
     return newname
 
@@ -307,7 +320,7 @@ def pre_deboost_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    touch_id = server.touch_to_state(request.POST['vm_id'], "Pre_Deboosting")
+    touch_id = server.touch_to_state(request.matchdict['name'], "Pre_Deboosting")
     return touch_id
 
 @view_config(request_method="POST", route_name='server_boost', renderer='json', permission="use")
@@ -317,7 +330,7 @@ def boost_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    touch_id = server.touch_to_state(request.POST['vm_id'], "Boosting")  # Boost Server
+    touch_id = server.touch_to_state(request.matchdict['name'], "Boosting")  # Boost Server
 
     # Now check if boost was successful, set deboost and remove credits accordingly.
     # if touch_id:
@@ -336,7 +349,7 @@ def stopped_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    touch_id = server.touch_to_state(request.POST['vm_id'], "Stopped")
+    touch_id = server.touch_to_state(request.matchdict['name'], "Stopped")
     return touch_id
 
 @view_config(request_method="POST", route_name='server_started', renderer='json', permission="use")
@@ -346,7 +359,17 @@ def started_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    touch_id = server.touch_to_state(request.POST['vm_id'], "Started")
+    touch_id = server.touch_to_state(request.matchdict['name'], "Started")
+    return touch_id
+
+@view_config(request_method="POST", route_name='server_error', renderer='json', permission="use")
+def error_server(request):
+    """Put a server into the "Started" status.
+
+    :param vm_id: ID of VApp which we want to stop.
+    :returns: JSON containing VApp ID and job ID for progress calls.
+    """
+    touch_id = server.touch_to_state(request.matchdict['name'], "Error")
     return touch_id
 
 @view_config(request_method="POST", route_name='server_prepared', renderer='json', permission="use")
@@ -356,7 +379,7 @@ def prepared_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    touch_id = server.touch_to_state(request.POST['vm_id'], "Prepared")
+    touch_id = server.touch_to_state(request.matchdict['name'], "Prepared")
     return touch_id
 
 @view_config(request_method="POST", route_name='server_pre_deboosted', renderer='json', permission="use")
@@ -366,7 +389,7 @@ def predeboosted_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    touch_id = server.touch_to_state(request.POST['vm_id'], "Pre_Deboosted")
+    touch_id = server.touch_to_state(request.matchdict['name'], "Pre_Deboosted")
     return touch_id
 
 @view_config(request_method="GET", route_name='server_job_status', renderer='json', permission="use")
@@ -376,7 +399,7 @@ def retrieve_job_progress(request):
     :param job_id: Internal job ID related to current task.
     :returns: JSON containing VApp ID and status.
     """
-    newname = server.check_progress(request.GET['job_id'])
+    newname = server.check_progress(request.matchdict['job'])
     return newname
 
 # Retrieve activity log from recent touches

@@ -64,7 +64,7 @@ class TestVMAPI(unittest.TestCase):
 
         self.create_user("testuser")
 
-        response = self.app.get('/users/testuser?actor_id=testuser',
+        response = self.app.get('/users/testuser',
                                 status=200,
                                 expect_errors=False)
 
@@ -103,7 +103,6 @@ class TestVMAPI(unittest.TestCase):
 
         !! Not implemented."""
         self.create_user("testuser")
-        print (current_state)
         response = self.app.delete('/users/testuser2',
                                    status=501,
                                    expect_errors=False)
@@ -114,14 +113,13 @@ class TestVMAPI(unittest.TestCase):
         Validate against the database with the user and password above.
         We should receive an access token."""
 
-        self.create_user("testuser")
+        self.create_user("testpassuser")
 
-        response = self.app.put('/users/testuser/password',
-                                {'actor_id': 'testuser',
-                                'password': 'testpass'},
+        response = self.app.put('/users/testpassuser/password',
+                                {'password': 'testpass'},
                                 status=200,
                                 expect_errors=False)
-        response = self.app.get('/users/testuser/password?actor_id=testuser&password=testpass',
+        response = self.app.get('/users/testpassuser/password?password=testpass',
                                 status=200,
                                 expect_errors=False)
 
@@ -147,6 +145,7 @@ class TestVMAPI(unittest.TestCase):
                                 {'actor_id': 'testuser'},
                                 status=200,
                                 expect_errors=False)
+
         assert json.loads(json.loads(response.text))['credit_balance'] == 1000  # ?? double encoded
 
     def test_create_own_retrieve_servers(self):  # FIX
@@ -181,8 +180,6 @@ class TestVMAPI(unittest.TestCase):
                                 {'artifact_id': 'testserver'},
                                 status=501,
                                 expect_errors=False)
-
-        assert json.loads(json.loads(response.text))['credit_balance'] == 1000  # ?? double encoded
 
     """ Server State-Change Functions. """
 
@@ -235,7 +232,7 @@ class TestVMAPI(unittest.TestCase):
 
         # Retrieve server details by name
 
-        response = self.app.get('/server_by_id/1',
+        response = self.app.get('/servers/by_id/1',
                                 status=200,
                                 expect_errors=False)
 

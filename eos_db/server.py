@@ -207,6 +207,7 @@ def set_deboost(hours, touch_id):
     session = Session()
     session.add(new_deboost)
     session.commit()
+    session.close()
 
 def list_servers_in_state(state):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
@@ -235,6 +236,7 @@ def get_server_id_from_name(name):
 def get_user_id_from_name(name):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
+    print (name)
     user_id = session.query(User.id).filter(User.handle == name).first()[0]
     session.close()
     return user_id
@@ -291,13 +293,13 @@ def get_server_uuid_by_id(id):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     server = session.query(Artifact.uuid).filter(Artifact.id == id).first()
-    print (server)
+    session.close()
     return server
 
 ##############################################################################
 
-def touch_to_add_session_key(userid, session_key):
-    touch_id = _create_touch(get_user_id_from_name(userid), None, None)
+def touch_to_add_session_key(user_id, session_key):
+    touch_id = _create_touch(user_id, None, None)
     session_id = create_session_key(touch_id, session_key)
     return session_id
 
@@ -513,13 +515,17 @@ def create_ownership(touch_id, user_id):
     session.close()
     return new_ownership.id
 
-def check_password(actor_id, password):
+def check_password(username, password):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    our_password = session.query(Password).filter(Password.touch_id == Touch.
-id).filter(Touch.actor_id == Actor.id).filter(Actor.handle == actor_id).order_by(Touch.id.desc()).first()
+    our_password = session.query(Password).filter(Password.touch_id == Touch.id).filter(Touch.actor_id == User.id).filter(User.username == username).order_by(Touch.id.desc()).first()
     session.close()
-    return our_password.check(str(password))
+    if our_password is None:
+        print ("No password for user")
+        return False
+    else:
+        print ("Checking password" + password)
+        return our_password.check(password)
 
 def _create_credit(touch_id, credit):
     """Creates a credit resource.
@@ -533,7 +539,6 @@ def _create_credit(touch_id, credit):
     session = Session()
     session.add(new_credit)
     session.commit()
-
     session.close()
     return new_credit.id
 
@@ -561,10 +566,9 @@ def check_credit(actor_id):
     requesting credit details.
     :returns: Current credit balance.
     """
-
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    credit = session.query(func.sum(Credit.credit)).filter(Credit.touch_id == Touch.id).filter(Touch.actor_id == Actor.id).filter(Actor.handle == actor_id).scalar()
+    credit = session.query(func.sum(Credit.credit)).filter(Credit.touch_id == Touch.id).filter(Touch.actor_id == Actor.id).filter(Actor.id == actor_id).scalar()
 
     session.close()
     return credit

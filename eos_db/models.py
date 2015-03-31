@@ -24,7 +24,7 @@ class RootFactory(object):
     """This is passed to pyramid.config.Configuratore in __init__.py,
        and says what persissions each group gets.
     """
-    __acl__ = [ (Allow, Everyone, 'token'),
+    __acl__ = [ (Allow, Everyone, 'login'),
                 (Allow, 'group:users', 'use'),
                 (Allow, 'group:agents', 'use'),
                 (Allow, 'group:agents', 'act'),
