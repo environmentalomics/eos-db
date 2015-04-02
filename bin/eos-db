@@ -2,6 +2,8 @@
 
 """EOS DB - Service Actions
 
+Note this will probably be implemented as a shell script to be run by root.
+
 Permissible instructions:
 
 start
@@ -12,5 +14,5 @@ restart
 
 import sys
 
-for arg in sys.argv:
-    print arg
+for arg in sys.argv[1:]:
+    print(arg)

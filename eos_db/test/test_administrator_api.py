@@ -211,7 +211,7 @@ class TestVMAPI(unittest.TestCase):
             push_to_state(state)
             current_state = get_state()
             assert current_state == state
-            print (current_state)
+            print(current_state)
 
     def test_retrieve_server(self):
         """ Pull back details of our server by name. """
