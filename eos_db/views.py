@@ -161,7 +161,7 @@ def retrieve_user_touches(request):
 
 # User credit addition, querying etc.
 
-@view_config(request_method="POST", route_name='user_credit', renderer='json', permission="use")
+@view_config(request_method="POST", route_name='user_credit', renderer='json', permission="administrate")
 def create_user_credit(request):
     """Adds credit to a user account, negative or positive.
 
