@@ -26,10 +26,10 @@ def home_view(request):
                               "Sessions": "/sessions",
                               "session": "/session",  # Get session details or
                               "users": "/users",  # Return user list
-                              "user": "/users/{name}",  # Get user details or
-                              "user_touches": "/users/{name}/touches",
-                              "user_password": "/users/{name}/password",
-                              "user_credit": "/users/{name}/credit",
+                              "user": "/user",  # Get logged-in user details or
+                              "user_touches": "/user/touches",
+                              "user_password": "/user/password",
+                              "user_credit": "/user/credit",
                               "servers": "/servers",  # Return server list
                               "server": "/servers/{name}",  # Get server details or
                               "server_by_id": "/servers/by_id/{name}",
@@ -111,7 +111,8 @@ def retrieve_user(request):
     :param actor_id: The user we are interested in.
     :returns JSON object containing user table data and credit balance.
     """
-    username = request.matchdict['name']
+    # username = request.matchdict['name']
+    username = request.authenticated_userid
     actor_id = server.get_user_id_from_name(username)
     if server.check_actor_id(username) == False:
         return HTTPForbidden()
@@ -141,20 +142,15 @@ def create_user_password(request):
 
 @view_config(request_method="GET", route_name='user_password', renderer='json', permission="use")
 def retrieve_user_password(request):
+    """ Standard login method. Basicauth is used for authorisation, so this
+    just checks that the user whose details we are requesting matches the
+    details passed from BasicAuth. """
+
     username = request.matchdict['name']
     actor_id = server.get_user_id_from_name(username)
-    print (username)
-    print (request.GET['password'])
-    verify = server.check_password(username, request.GET['password'])
-    print (verify)
-    if verify == True:
-        key = str(uuid.UUID(bytes=bcrypt.gensalt()[8:24]))
-        server.touch_to_add_session_key(actor_id, key)
-        return key
-    else:
-        response = HTTPUnauthorized()
-        return response
-
+    bapauth = request.authenticated_userid
+    print (bapauth)
+    return True if (bapauth == username) else None
 
 # Retrieve activity log from recent touches
 
@@ -209,7 +205,9 @@ def retrieve_user_credit(request):
 
 @view_config(request_method="GET", route_name='servers', renderer='json', permission="use")
 def retrieve_servers(request):
-    server_list = server.list_artifacts_for_user(request.GET['actor_id'])
+    print ("Servers for user: " + request.authenticated_userid)
+    server_list = server.list_artifacts_for_user(request.authenticated_userid)
+    print (server_list)
     return server_list
 
 @view_config(request_method="GET", route_name='state', renderer='json', permission="use")

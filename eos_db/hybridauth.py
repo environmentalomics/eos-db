@@ -4,13 +4,13 @@ from pyramid.httpexceptions import HTTPUnauthorized
 
 class HybridAuthenticationPolicy():
 
-    def __init__(self, check, secret, realm='Realm'):
+    def __init__(self, check, secret, callback, realm='Realm'):
         self.check = check
         self.realm = realm
         self.secret = secret
 
         self.bap = BasicAuthAuthenticationPolicy(check, realm)
-        self.tap = AuthTktAuthenticationPolicy(secret)
+        self.tap = AuthTktAuthenticationPolicy(secret, callback, hashalg='sha256')
 
     def unauthenticated_userid(self, request):
         """ Return the userid parsed from the auth ticket cookie. If this does
@@ -41,8 +41,10 @@ class HybridAuthenticationPolicy():
     def effective_principals(self, request):
         print ("Principals")
         userid = self.tap.authenticated_userid(request)
+        print (userid)
         if userid:
             print ("Tap")
+            print (str(self.tap.effective_principals(request)))
             return self.tap.effective_principals(request)
         else:
             print ("Bap")
@@ -50,7 +52,6 @@ class HybridAuthenticationPolicy():
 
     def remember(self, request, principal, **kw):
         """"""
-        print ("Remember " + str(self.tap.remember(request, principal, **kw)))
         return self.tap.remember(request, principal, **kw)
 
     def forget(self, request):

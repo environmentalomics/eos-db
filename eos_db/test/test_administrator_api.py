@@ -34,7 +34,7 @@ class TestVMAPI(unittest.TestCase):
                                         # DB each time.
 
         # Switch to API basic auth with created account
-        self.app.authorization = ('Basic', ('administrator', 'adminpass'))
+
 
         # Create admin user. This will implicitly generate the tables.
 
@@ -43,6 +43,7 @@ class TestVMAPI(unittest.TestCase):
         server.touch_to_add_password(1, "adminpass")
 
         response = self.app.post('/setup_states')
+        # Change to direct call.
 
     """Basic API support functions."""
 

@@ -163,12 +163,11 @@ def list_artifacts_for_user(user_id):
     :returns: List of dictionaries containing pertinent info.
     """
     artifacts = []
-    for artifact_id, artifact_name in _list_artifacts_for_user(user_id):
-        artifacts.append(return_artifact_details(artifact_id))
+    for artifact_id, artifact_uuid, artifact_name in _list_artifacts_for_user(user_id):
+        artifacts.append(return_artifact_details(artifact_id, artifact_name, artifact_uuid))
     return artifacts
 
-def return_artifact_details(artifact_id):
-    artifact_name = get_server_name_from_id(artifact_id)[0]
+def return_artifact_details(artifact_id, artifact_name="", artifact_uuid=""):
     change_dt = _get_most_recent_change(artifact_id)
     create_dt = _get_artifact_creation_date(artifact_id)
     state = _get_most_recent_artifact_state(artifact_id)
@@ -188,8 +187,13 @@ def return_artifact_details(artifact_id):
         state = "Not yet initialised"
     else:
         state = state[0]
+    if artifact_uuid == "":
+        artifact_uuid = get_server_uuid_by_id(artifact_id)[0]
+    if artifact_name == "":
+        artifact_name = get_server_name_from_id(artifact_id)[0]
     return({"artifact_id": artifact_id,
-            "artifact_uuid": artifact_name,
+            "artifact_uuid": artifact_uuid,
+            "artifact_name": artifact_name,
             "change_dt": str(change_dt[0])[0:16],
             "create_dt": str(create_dt[0])[0:16],
             "state": state,
@@ -222,7 +226,7 @@ def list_servers_in_state(state):
 def get_server_name_from_id(artifact_id):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    artifact_name = session.query(Artifact.uuid).filter(Artifact.id == artifact_id).first()
+    artifact_name = session.query(Artifact.name).filter(Artifact.id == artifact_id).first()
     session.close()
     return artifact_name
 
@@ -619,7 +623,7 @@ def _list_artifacts_for_user(user_id):
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    servers = session.query(Artifact.id, Artifact.uuid) \
+    servers = session.query(Artifact.id, Artifact.uuid, Artifact.name) \
                 .filter(Artifact.id == Touch.artifact_id) \
                 .filter(Touch.id == Ownership.touch_id) \
                 .filter(Ownership.user_id == Actor.id) \

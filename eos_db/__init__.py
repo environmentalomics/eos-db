@@ -17,29 +17,37 @@ def add_cors_headers_response_callback(event):
         log = logging.getLogger(__name__)
         if 'Origin' in request.headers:
             origin = request.headers['Origin']
+            print ("Origin: " + origin)
             if origin in ALLOWED_ORIGIN:
                 log.debug('Access Allowed')
-                response.headers['Access-Control-Allow-Origin'] = '*'
+                response.headers['Access-Control-Allow-Origin'] = origin
                 response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, OPTIONS, DELETE, PATCH'
-                response.headers['Access-Control-Allow-Headers'] = 'eos-token'
-                response.headers['Access-Control-Allow-Credentials'] = 'True'
+                response.headers['Access-Control-Allow-Credentials'] = 'true'
 
     event.request.add_response_callback(cors_headers)
 
-def add_test_callback(event):
+def add_cookie_callback(event):
 
-    def test_callback(request, response):
+    def cookie_callback(request, response):
         if response.status[0] == '2':
             print (remember(request, request.authenticated_userid))
             response.headers.update(remember(request, request.authenticated_userid))
-    event.request.add_response_callback(test_callback)
+
+    event.request.add_response_callback(cookie_callback)
+
+def groupfinder(userid, request):
+    """ Return the group associated with the userid """
+    group = server.get_user_group(userid)
+    if group is not None:
+        return ["group:" + str(group[0])]
+
 
 def passwordcheck():
     """Generates a callback supplied to HybridAuthenticationPolicy to check
        the password.
     """
 
-    # Bcrypy is slow, which is good to deter dictionary attacks, but bad when
+    # Bcrypt is slow, which is good to deter dictionary attacks, but bad when
     # the same user is calling multiple API calls, and especially bad for the tests.
     # This one-item cache should be crude but effective:
     lastpass = [""]
@@ -48,15 +56,15 @@ def passwordcheck():
         print("Checking %s:%s for %s" % (login, password, request))
         print("Lastpass is " + lastpass[0])
 
-        print ('Password Check' + login + password)
-
         if login == "agent" and password == "sharedsecret":
-            return ['group:agents']
+            return ['group-agents']
 
         elif (str(lastpass[0]) == login + ":" + password or
              eos_db.server.check_password(login, password)):
 
                 user_group = eos_db.server.get_user_group(login)[0]
+
+                print("Found user group " + user_group)
 
                 if user_group in ("administrators", "users", "agents"):
                     # Remember that this worked
@@ -74,13 +82,13 @@ def passwordcheck():
 
 def main(global_config, **settings):
 
-    hap = HybridAuthenticationPolicy(check=passwordcheck(), secret="Spanner", realm="eos_db")
+    hap = HybridAuthenticationPolicy(check=passwordcheck(), secret="Spanner", callback=groupfinder, realm="eos_db")
     config = Configurator(settings=settings,
                           authentication_policy=hap,
                           root_factory='eos_db.models.RootFactory')
 
     config.add_subscriber(add_cors_headers_response_callback, NewRequest)
-    config.add_subscriber(add_test_callback, NewRequest)
+    config.add_subscriber(add_cookie_callback, NewRequest)
 
     # Needed to ensure proper 401 responses
     config.add_forbidden_view(hap.get_forbidden_view)
@@ -107,7 +115,7 @@ def main(global_config, **settings):
     # User-related API calls
 
     config.add_route('users', '/users')  # Return user list
-    config.add_route('user', '/users/{name}')  # Get user details or
+    config.add_route('user', '/user')  # Get user details or
                                                         # Put new user or
                                                         # Delete user
 
@@ -118,7 +126,7 @@ def main(global_config, **settings):
                                             # Put new password
                                             # Get password verification
 
-    config.add_route('user_credit', '/users/{name}/credit')
+    config.add_route('user_credit', '/user/credit')
                                             # Put new credit or debit
                                             # Get current balance
 
