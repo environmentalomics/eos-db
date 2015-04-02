@@ -416,6 +416,8 @@ def set_server_specification(request):
 
     # Filter for bad requests
 
+    # FIXME - check against valid machine states in settings.py
+
     if (request.POST['cores'] not in ['1', '2', '4', '16']) or (request.POST['ram'] not in ['1', '4', '8', '16', '500']):
         return HTTPBadRequest()
     else:
