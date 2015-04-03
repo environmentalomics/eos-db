@@ -1,3 +1,7 @@
+""" EOS-DB Init Module.
+
+Contains routing for EOS-DB API, and callbacks for response modification."""
+
 from pyramid.config import Configurator
 from pyramid.events import NewRequest, NewResponse
 from pyramid.security import authenticated_userid, remember
@@ -11,9 +15,16 @@ from pyramid.httpexceptions import HTTPUnauthorized
 
 ALLOWED_ORIGIN = ('http://localhost:6542',)
 
-def add_cors_headers_response_callback(event):
+def add_cors_headers_response_callback(event): # FIXME - Invalid name (PEP8)
+    """ Add response header to enable Cross-Origin Resource Sharing. The
+    calling domain is checked against the tuple ALLOWED_ORIGIN, and if it
+    matches, then a set of allow headers are sent, allowing the origin, the
+    set of methods, and the passing of credentials, which is essential for
+    the pass-through token auth which we use for security. """
 
     def cors_headers(request, response):
+        """ Callback for CORS. """
+
         log = logging.getLogger(__name__)
         if 'Origin' in request.headers:
             origin = request.headers['Origin']
@@ -21,22 +32,35 @@ def add_cors_headers_response_callback(event):
             if origin in ALLOWED_ORIGIN:
                 log.debug('Access Allowed')
                 response.headers['Access-Control-Allow-Origin'] = origin
-                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, OPTIONS, DELETE, PATCH'
+                response.headers['Access-Control-Allow-Methods'] = \
+                    'GET, POST, PUT, OPTIONS, DELETE, PATCH'
                 response.headers['Access-Control-Allow-Credentials'] = 'true'
 
     event.request.add_response_callback(cors_headers)
 
 def add_cookie_callback(event):
+    """ Add a cookie containing a security token to all response headers from
+    eos_db."""
 
     def cookie_callback(request, response):
+        """ Cookie callback. """
+
         if response.status[0] == '2':
             print (remember(request, request.authenticated_userid))
-            response.headers.update(remember(request, request.authenticated_userid))
+            response.headers.update(remember(request,
+                                             request.authenticated_userid))
 
     event.request.add_response_callback(cookie_callback)
 
 def groupfinder(userid, request):
-    """ Return the group associated with the userid """
+    """ Return the user group associated with the userid. This uses a server
+    function to check which group a user has been associated with. The valid
+    groups are stored in models.RootFactory """
+
+    # FIXME - server not called correctly. Is this even being called?
+    # Also groupfinder doesn't use the request argument any more. Can be
+    # streamlined.
+
     group = server.get_user_group(userid)
     if group is not None:
         return ["group:" + str(group[0])]
@@ -44,45 +68,56 @@ def groupfinder(userid, request):
 
 def passwordcheck():
     """Generates a callback supplied to HybridAuthenticationPolicy to check
-       the password.
+       the password. The password check is cached to speed up checking when
+       the same user is repeatedly accessing the system, or when the system
+       makes multiple password checks for a single request.
     """
 
     # Bcrypt is slow, which is good to deter dictionary attacks, but bad when
-    # the same user is calling multiple API calls, and especially bad for the tests.
-    # This one-item cache should be crude but effective:
+    # the same user is calling multiple API calls, and especially bad for the
+    # tests. This one-item cache should be crude but effective:
     lastpass = [""]
 
     def _passwordcheck(login, password, request):
+        """ Password checking callback. """
+
         print("Checking %s:%s for %s" % (login, password, request))
         print("Lastpass is " + lastpass[0])
 
         if login == "agent" and password == "sharedsecret":
             return ['group-agents']
 
-        elif (str(lastpass[0]) == login + ":" + password or
-             eos_db.server.check_password(login, password)):
+        elif (str(lastpass[0]) == login + ":" + password or \
+        eos_db.server.check_password(login, password)):
 
-                user_group = eos_db.server.get_user_group(login)[0]
+            user_group = eos_db.server.get_user_group(login)[0]
 
-                print("Found user group " + user_group)
+            print("Found user group " + user_group)
 
-                if user_group in ("administrators", "users", "agents"):
-                    # Remember that this worked
-                    lastpass[0] = login + ":" + password
+            if user_group in ("administrators", "users", "agents"):
+                # Remember that this worked
+                lastpass[0] = login + ":" + password
 
-                    return ['group:' + user_group]
-                else:
-                    lastpass[0] = ""
-                    return None
+                return ['group:' + user_group]
+            else:
+                lastpass[0] = ""
+                return None
         else:
             lastpass[0] = ""
             return None
 
     return _passwordcheck
 
+#FIXME? main takes global_config as an argument here but why?
 def main(global_config, **settings):
+    """ Set routes, authentication policies, and add callbacks to modify
+    responses."""
 
-    hap = HybridAuthenticationPolicy(check=passwordcheck(), secret="Spanner", callback=groupfinder, realm="eos_db")
+
+    hap = HybridAuthenticationPolicy(check=passwordcheck(),
+                                     secret="Spanner", #FIXME
+                                     callback=groupfinder,
+                                     realm="eos_db")
     config = Configurator(settings=settings,
                           authentication_policy=hap,
                           root_factory='eos_db.models.RootFactory')
@@ -94,9 +129,11 @@ def main(global_config, **settings):
     config.add_forbidden_view(hap.get_forbidden_view)
 
     settings = config.registry.settings
+    #FIXME - server again not being called correctly here. Fix the import
+    #or the reference below.
     server.choose_engine(settings['server'])
 
-    # Top-level home page. Yields API call list?
+    # Top-level home page. Yields API call list.
 
     config.add_route('home', '/')
 
@@ -107,17 +144,17 @@ def main(global_config, **settings):
 
     # Session API calls
 
-    config.add_route('sessions', '/sessions')  # Get session list
-    config.add_route('session', '/session')  # Get session details or
-                                            # Post new session or
-                                            # Delete session
+    config.add_route('sessions', '/sessions')   # Get session list
+    config.add_route('session', '/session')     # Get session details or
+                                                # Post new session or
+                                                # Delete session
 
     # User-related API calls
 
-    config.add_route('users', '/users')  # Return user list
-    config.add_route('user', '/user')  # Get user details or
-                                                        # Put new user or
-                                                        # Delete user
+    config.add_route('users', '/users') # Return user list
+    config.add_route('user', '/user')   # Get user details or
+                                        # Put new user or
+                                        # Delete user
 
     config.add_route('user_touches', '/users/{name}/touches')
                                             # Get server touches
@@ -141,40 +178,37 @@ def main(global_config, **settings):
 
     # Server state-related calls.
 
-    config.add_route('states', '/states')  # Get list of servers in given state.
-    config.add_route('state', '/states/{name}')  # Get list of servers in given state.
+    config.add_route('states', '/states')  # FIXME - Remove.
+    config.add_route('state', '/states/{name}') # Get list of servers in
+                                                # the given state.
 
     config.add_route('server_start', '/servers/{name}/Starting')
     config.add_route('server_stop', '/servers/{name}/Stopping')
-
     config.add_route('server_restart', '/servers/{name}/Restarting')
-
     config.add_route('server_pre_deboost', '/servers/{name}/Pre_Deboosting')
     config.add_route('server_pre_deboosted', '/servers/{name}/Pre_Deboosted')
-
     config.add_route('server_started', '/servers/{name}/Started')
     config.add_route('server_stopped', '/servers/{name}/Stopped')
-
     config.add_route('server_prepare', '/servers/{name}/Preparing')
     config.add_route('server_prepared', '/servers/{name}/Prepared')
-
     config.add_route('server_boost', '/servers/{name}/Boosting')
     config.add_route('server_boosted', '/servers/{name}/Boosted')
-
     config.add_route('server_error', '/servers/{name}/Error')
 
-    config.add_route('server_state', '/servers/{name}/state')
-
-    config.add_route('server_owner', '/servers/{name}/owner')  #
-
-
-    config.add_route('server_touches', '/servers/{name}/touches')
-    config.add_route('server_job_status', '/servers/{name}/job/{job}/status')  # Get server touches
+    config.add_route('server_state',
+                     '/servers/{name}/state') # Get or put server state
+    config.add_route('server_owner',
+                     '/servers/{name}/owner')  # Get or put server ownership
+    config.add_route('server_touches',
+                     '/servers/{name}/touches') # Get server touches.
+    config.add_route('server_job_status',
+                     '/servers/{name}/job/{job}/status')  # Get server touches
 
     # Server configuration change calls.
 
-    config.add_route('server_specification', 'servers/{name}/specification')  # Get or put server specification
+    config.add_route('server_specification',
+                     'servers/{name}/specification')    # Get or put server
+                                                        # specification
 
     config.scan()
     return config.make_wsgi_app()
-
