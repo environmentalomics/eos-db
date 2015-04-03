@@ -1,44 +1,56 @@
-"""Cloudhands database models
+"""Cloudhands database and security models.
 
-The data model for Cloudhands is heavily subclassed using the xxxx concept
-from SQLAlchemy.
+The data model for Cloudhands is heavily subclassed using the concept of
+multi-table inheritance. For example, a large number of the models are
+subclassed from the Resource class. This usefully represents the fact that an
+actor or artifact can have a variety of resources associated with them.
+
+Important concepts:
+
+* Actor: Something that acts upon the system. Could be a user or an agent or
+daemon.
+
+* Artifact: Something which is created and then acted upon. An artifact is
+acted upon by "Touches" being made to the artifact, in order to apply
+"Resources", or change the artifact's "State".
 
 """
 
-##############################################################################
-
-import os
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
+import os  # FIXME Unused import
+from sqlalchemy import create_engine  # FIXME Unused import
 from sqlalchemy import Column, Integer, String, DateTime, CHAR, ForeignKey
-from sqlalchemy import UniqueConstraint, CheckConstraint
+from sqlalchemy import UniqueConstraint, CheckConstraint  # FIXME Unused import
 from sqlalchemy.orm import relationship
-
-Base = declarative_base()
-
+from sqlalchemy.ext.declarative import declarative_base
 from pyramid.security import Allow, Everyone
-
 from bcrypt import hashpw, gensalt
+
+# FIXME - Base here defined with an invalid name (caps B)
+
+Base = declarative_base()  # The standard base object for declaratively
+                            # instantiated data models.
 
 class RootFactory(object):
     """This is passed to pyramid.config.Configuratore in __init__.py,
-       and says what persissions each group gets.
-    """
-    __acl__ = [ (Allow, Everyone, 'login'),
-                (Allow, 'group:users', 'use'),
-                (Allow, 'group:agents', 'use'),
-                (Allow, 'group:agents', 'act'),
-                (Allow, 'group:administrators', 'use'),
-                (Allow, 'group:administrators', 'act'),
-                (Allow, 'group:administrators', 'administer') ]
+       and defines the persissions attributed to each group. """
+
+    __acl__ = [(Allow, Everyone, 'login'),
+               (Allow, 'group:users', 'use'),
+               (Allow, 'group:agents', 'use'),
+               (Allow, 'group:agents', 'act'),
+               (Allow, 'group:administrators', 'use'),
+               (Allow, 'group:administrators', 'act'),
+               (Allow, 'group:administrators', 'administer')]
     def __init__(self, request):
+        """ No-operations here. """
         pass
 
 class Actor(Base):
-    """
-    An actor is any entity which is permitted to make an action. In the
-    context of this system, this could be a user or an agent.
-    """
+    """ An actor is any entity which is permitted to make an action. In the
+    context of this system, this could be a user or an agent. Actor is
+    subclassed for each type of actor which can effect a state-change in the
+    system. """
+
     __tablename__ = 'actor'
 
     id = Column(Integer, primary_key=True)
@@ -60,10 +72,8 @@ class Actor(Base):
         "polymorphic_on": type
     }
 
-# Actor is subclassed for each type of actor which can
-# effect a state-change in the system.
-
 class Component(Actor):
+    """ Unused in our version of the system. """  # FIXME: Consider removal.
     __tablename__ = 'component'
     id = Column(Integer, ForeignKey('actor.id'), primary_key=True)
 
@@ -78,16 +88,13 @@ class User(Actor):
 
     __mapper_args__ = {"polymorphic_identity": "user"}
 
-    # def __repr__(self):
-    #    return "<User(username='%s')>" % self.username
-
-##############################################################################
-
 class Artifact(Base):
     """
     An artifact is an output of the system, created at the request of a user.
-    Examples include a registration or an appliance.
-    """
+    Examples include a registration or an appliance. The base class of Artifact
+    is subclassed for each type of artifact which can be created at the request
+    of a user. """
+
     __tablename__ = 'artifact'
 
     id = Column(Integer, primary_key=True)
@@ -99,26 +106,24 @@ class Artifact(Base):
         "polymorphic_identity": "artifact",
         "polymorphic_on": type}
 
-# The base class of Artifact is subclassed for each type of artifact which
-# can be created at the request of a user.
-
 class Appliance(Artifact):
+    """ An appliance represents a VApp in the virtual environment. """
     __tablename__ = 'appliance'
     id = Column(Integer, ForeignKey('artifact.id'), primary_key=True)
     __mapper_args__ = {"polymorphic_identity": "appliance"}
 
 
 class Registration(Artifact):
+    """ Unused in our version of the system. """  # FIXME: Consider removal.
     __tablename__ = 'registration'
     id = Column(Integer, ForeignKey('artifact.id'), primary_key=True)
     __mapper_args__ = {"polymorphic_identity": "registration"}
 
 class Membership(Artifact):
+    """ Unused in our version of the system. """  # FIXME: Consider removal.
     __tablename__ = 'membership'
     id = Column(Integer, ForeignKey('artifact.id'), primary_key=True)
     __mapper_args__ = {"polymorphic_identity": "membership"}
-
-##############################################################################
 
 class Touch(Base):
     """
@@ -161,17 +166,15 @@ class State(Base):
     __mapper_args__ = {"polymorphic_identity": "state", 'polymorphic_on': fsm}
 
 class ArtifactState(State):
+    """All states applicable to artifacts. Subclasses state. User states or
+    boost verification states could potentially be created as siblings."""
+
     __tablename__ = "artifactstate"
 
     id = Column("id", Integer, ForeignKey("state.id"),
                 nullable=False, primary_key=True)
 
     __mapper_args__ = {"polymorphic_identity": "artifactstate"}
-    # __table_args__ = (CheckConstraint(State.name in ['Stopped', 'Starting', 'Started',
-    #                                           'Boosting', 'Boosted','Deboosting',
-    #                                           'Suspending', 'Suspended', 'Stopping']),)
-
-##############################################################################
 
 class Resource(Base):
     """
@@ -248,15 +251,19 @@ class Password(Resource):
 
     def __init__(self, **kwargs):
         # Crypt it
-        kwargs['password'] = hashpw(kwargs['password'].encode(), gensalt()).decode()
+        kwargs['password'] = hashpw(kwargs['password'].encode(),
+                                    gensalt()).decode()
         super(self.__class__, self).__init__(**kwargs)
+        # FIXME: Resource needs to inherit from object to make use of "super"
+        # here best-practice compliant.
 
     def check(self, candidate):
         """Checks if a candidate password matches the stored crypt-ed password.
            Caller should use this rather than attempting manual comparison.
         """
         # This only works on Py3!
-        return self.password.encode() == hashpw(candidate.encode(), self.password.encode())
+        return self.password.encode() == hashpw(candidate.encode(),
+                                                self.password.encode())
 
 class Credit(Resource):
     """Represents the addition or subtraction of credit from the user's account.
@@ -291,8 +298,8 @@ class SessionKey(Resource):
     __mapper_args__ = {"polymorphic_identity": "sessionkey"}
 
 class Specification(Resource):
-    """Represents a given set of configuration options for an artifact.
-    """
+    """Represents a given set of configuration options for an artifact. """
+
     __tablename__ = "specification"
 
     id = Column("id", Integer, ForeignKey("resource.id"),
@@ -307,8 +314,9 @@ class Specification(Resource):
     __mapper_args__ = {"polymorphic_identity": "specification"}
 
 class Deboost(Resource):
-    """
-    """
+    """ Represents a scheduled datetime at which a deboost of a given machine
+    should take place. """
+
     __tablename__ = "deboost"
 
     id = Column("id", Integer, ForeignKey("resource.id"),
