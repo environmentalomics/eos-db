@@ -180,8 +180,7 @@ def list_artifacts_for_user(user_id):
     return artifacts
 
 def return_artifact_details(artifact_id, artifact_name="", artifact_uuid=""):
-    """
-    """
+    """ Return basic information about each server. """
     change_dt = _get_most_recent_change(artifact_id)
     create_dt = _get_artifact_creation_date(artifact_id)
     state = _get_most_recent_artifact_state(artifact_id)
@@ -218,6 +217,9 @@ def return_artifact_details(artifact_id, artifact_name="", artifact_uuid=""):
             })
 
 def set_deboost(hours, touch_id):
+    """ Set and number of hours in the future at which a VM ought to be
+    deboosted. Requires application of an associated touch in order to
+    link it to an artifact. """
     deboost_dt = datetime.now()
     deboost_dt += timedelta(hours=hours)
     new_deboost = Deboost(deboost_dt=deboost_dt, touch_id=touch_id)
@@ -228,6 +230,7 @@ def set_deboost(hours, touch_id):
     session.close()
 
 def list_servers_in_state(state):
+    """ Return a list of servers in the state specified. """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     servers = (session
@@ -244,6 +247,11 @@ def list_servers_in_state(state):
     return result
 
 def get_server_name_from_id(artifact_id):
+    """ Get the name field from an artifact.
+
+    :param artifact_id: A valid artifact id.
+    :returns: name of artifact.
+    """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     artifact_name = (session
@@ -254,6 +262,13 @@ def get_server_name_from_id(artifact_id):
     return artifact_name
 
 def get_server_id_from_name(name):
+    """ Get the system ID of a server from its name.
+
+    :param name: The name of an artifact.
+    :returns: Internal ID of artifact.
+    """
+    # FIXME - Check behaviour on duplicate names. This should not be a problem
+    # due to database constraints, but is worth looking at, just in case.
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     artifact_id = (session
@@ -264,6 +279,13 @@ def get_server_id_from_name(name):
     return artifact_id
 
 def get_user_id_from_name(name):
+    """ Get the system ID of a user from his name.
+
+    :param name: The name of a user.
+    :returns: Internal ID of user.
+    """
+    # FIXME - Behaviour with duplicates also applies here. Ensure constraints
+    # properly set.
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     print (name)
@@ -272,8 +294,16 @@ def get_user_id_from_name(name):
     return user_id
 
 def _get_server_boost_status(artifact_id):
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
+    """ Return the boost status (either "Boosted" or "Unboosted" of the given
+    artifact by ID.
+
+    Get the system ID of a user from his name.
+
+    :param artifact_id: The artifact in question by ID.
+    :returns: String giving boost status.
+    """
+    # FIXME: Ideally this should really return a boolean to indicate whether a
+    # machine is boosted or not.
     try:
         cores, ram = get_latest_specification(artifact_id)
     except:
@@ -285,6 +315,11 @@ def _get_server_boost_status(artifact_id):
         return "Unboosted"
 
 def get_deboost_credits(artifact_id):
+    """ Get the number of credits which should be refunded upon deboost.
+
+    :param artifact_id: The artifact in question by ID.
+    :returns: Number of credits to be refunded..
+    """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     hours = get_hours_until_deboost(artifact_id)
@@ -302,6 +337,12 @@ def get_deboost_credits(artifact_id):
     return deboost_credits
 
 def list_server_in_state(state):
+    """ Iterates through servers until it finds a server in the state
+    requested.
+
+    :param state: A string containing the name of a state.
+    :returns: Artifact ID.
+    """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     servers = session.query(Artifact.id).all()
@@ -313,11 +354,24 @@ def list_server_in_state(state):
     return stated_server
 
 def touch_to_add_ownership(artifact_id, user_id):
+    """ Adds an ownership resource to an artifact, effectively linking the VM
+    to the user specified. This is in order to prevent users from seeing each
+    other's VMs.
+
+    :param artifact_id: The artifact in question by ID.
+    :param user_id: The user in question by ID.
+    :returns: ownership_id: The ID of the ownership created.
+    """
     touch_id = _create_touch(None, artifact_id, None)
     ownership_id = create_ownership(touch_id, user_id)
     return ownership_id
 
 def get_server_uuid_by_id(id):
+    """ Get the uuid field from an artifact.
+
+    :param artifact_id: A valid artifact id.
+    :returns: uuid of artifact.
+    """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     server = session.query(Artifact.uuid).filter(Artifact.id == id).first()
@@ -325,11 +379,16 @@ def get_server_uuid_by_id(id):
     return server
 
 def touch_to_add_session_key(user_id, session_key):
+    """ Add a session key resource to a user."""
+    # FIXME - This can be removed - it shouldn't have any purpose in the
+    # current system.
     touch_id = _create_touch(user_id, None, None)
     session_id = create_session_key(touch_id, session_key)
     return session_id
 
 def create_session_key(touch_id, session_key):
+    # FIXME - This can be removed - it shouldn't have any purpose in the
+    # current system.
     new_session_key = SessionKey(touch_id=touch_id, session_key=session_key)
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
@@ -339,12 +398,19 @@ def create_session_key(touch_id, session_key):
     return new_session_key.id
 
 def check_token(token, artifact_id):
+    # FIXME - This was built for the old auth philosophy and has to be altered.
     """Check if artifact belongs to owner of token"""
     # token_actor_id = get_token_owner(token)
     # return check_ownership(artifact_id, token_actor_id)
     return True
 
 def check_ownership(artifact_id, actor_id):
+    """ Check if an artifact belongs to a given user.
+
+    :param artifact_id: A valid artifact id.
+    :param actor_id: A valid actor id.
+    :returns: boolean to indicate ownership.
+    """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     our_ownership = (session
@@ -441,7 +507,10 @@ def touch_to_add_specification(vm_id, cores, ram):
     return success
 
 def get_latest_specification(vm_id):
-    """
+    """ Return the most recent / current state of a VM.
+
+    :param vm_id: A valid VM id.
+    :returns: String containing current status.
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
@@ -454,6 +523,11 @@ def get_latest_specification(vm_id):
     return state
 
 def get_latest_deboost_dt(vm_id):
+    """ Return the most recent / current deboost date of a VM.
+
+    :param vm_id: A valid VM id.
+    :returns: String containing most recent deboost date.
+    """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     state = session.query(Deboost.deboost_dt). \
