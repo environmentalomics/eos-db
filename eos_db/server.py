@@ -4,9 +4,9 @@ This file contains functions which either make direct modifications to the
 Cloudhands database, request information from the DB, or bundle a series of
 functions which cause a number of DB changes to take effect.
 """
-##############################################################################
 
-from eos_db.models import Artifact, Appliance, Registration, Membership, GroupMembership
+from eos_db.models import Artifact, Appliance, Registration
+from eos_db.models import Membership, GroupMembership
 from eos_db.models import Actor, Component, User, Ownership
 from eos_db.models import Touch
 from eos_db.models import State, ArtifactState, Deboost, SessionKey
@@ -16,7 +16,7 @@ from eos_db.models import Base
 DB = None
 try:
     from eos_db.settings import DBDetails as DB
-except:
+except:  # FIXME: What the actual heck?! Bare except statement. :-D
     # If no settings file is supplied, connect to the database eos_db without
     # a username or password - ie. rely on PostgreSQL ident auth.
     pass
@@ -24,17 +24,15 @@ except:
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
-
 from datetime import datetime, timedelta
 
-engine = ""
-
-##############################################################################
+engine = ""  # Assume no default database connection
 
 def choose_engine(enginestring):
     """
-
-
+    Create a connection to a database. If Postgres is selected, this will
+    connect to the database specified in the settings.py file. If SQLite is
+    selected, then the system will use an in-memory SQLite database.
     """
     global engine
 
@@ -42,7 +40,10 @@ def choose_engine(enginestring):
         if DB and DB.username:
             # Password auth
             engine = create_engine('postgresql://%s:%s@%s/%s'
-                                   % (DB.username, DB.password, DB.host, DB.database),
+                                   % (DB.username,
+                                      DB.password,
+                                      DB.host,
+                                      DB.database),
                                    echo=True)
         elif DB:
             engine = create_engine('postgresql:///%s'
@@ -56,9 +57,6 @@ def choose_engine(enginestring):
 
     else:
         raise LookupError("Invalid server type.")
-
-##############################################################################
-
 
 def override_engine(engine_string):
     """Sets the target database to a different location than that specified in
@@ -75,15 +73,16 @@ def deploy_tables():
     Base.metadata.create_all(engine)
 
 def setup_states(state_list):
+    """ Write the list of valid states to the database. """
+    # FIXME: Make sure states must be distinct
     for state in state_list:
-        _create_artifact_state(state)  # Make sure states must be distinct
-
-##############################################################################
+        _create_artifact_state(state)
 
 def create_user(type, handle, name, username):
-    """Create a new user record.
-
-    """
+    """Create a new user record. """
+    # FIXME: A lot of these "touch_to_add" and "create" calls share very similar
+    # boilerplate. This file could be significantly reduced in size by the
+    # judicious use of decorators.
     Base.metadata.create_all(engine)
     new_user = User(name=name, username=username, uuid=handle, handle=handle)
     Session = sessionmaker(bind=engine, expire_on_commit=False)
@@ -94,12 +93,15 @@ def create_user(type, handle, name, username):
     return new_user.id
 
 def touch_to_add_user_group(username, group):
+    """ Adds a touch to the database, then links it to a new user group
+    record. """
     user_id = get_user_id_from_name(username)
     touch_id = _create_touch(user_id, None, None)
     create_group_membership(touch_id, group)
     return touch_id
 
 def create_group_membership(touch_id, group):
+    """ Create a new group membership resource. """
     Base.metadata.create_all(engine)
     new_membership = GroupMembership(group=group)
     Session = sessionmaker(bind=engine, expire_on_commit=False)
@@ -110,11 +112,16 @@ def create_group_membership(touch_id, group):
     return new_membership.id
 
 def get_user_group(username):
+    """ Get the group associated with a given username. """
     if username is not None:
         actor_id = get_user_id_from_name(username)
         Session = sessionmaker(bind=engine, expire_on_commit=False)
         session = Session()
-        group = session.query(GroupMembership.group).filter(Touch.actor_id == actor_id).order_by(Touch.touch_dt.desc()).first()
+        group = (session
+                 .query(GroupMembership.group)
+                 .filter(Touch.actor_id == actor_id)
+                 .order_by(Touch.touch_dt.desc())
+                 .first())
         session.close()
         return group
     else:
@@ -122,9 +129,8 @@ def get_user_group(username):
 
 
 def create_appliance(name, uuid):
-    """
-
-    """
+    """ Create a new VApp """  # FIXME: We shoehorn VMs into the Vapp record.
+    # VMs should go into the "Node" object.
     Base.metadata.create_all(engine)
     new_appliance = Appliance(uuid=uuid, name=name)
     Session = sessionmaker(bind=engine, expire_on_commit=False)
@@ -135,8 +141,8 @@ def create_appliance(name, uuid):
     return new_appliance.id
 
 def create_artifact_state(state_name):
-    """
-    """
+    """ Create a new artifact state. ArtifactState subclasses State. See the
+    relevant docs in the model. """
     new_artifact_state = ArtifactState(name=state_name)
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
@@ -147,13 +153,15 @@ def create_artifact_state(state_name):
 
 def change_node_state(node_id, state_id):
     """
-
+    Unused.
     """
+    pass  # FIXME: See above for comments related to Vapps and VMs.
 
 def create_node():
     """
-    Required for the list_server push
+    Unused.
     """
+    pass  # FIXME: See above for comments related to Vapps and VMs.
 
 def list_artifacts_for_user(user_id):
     """Returns a list of dictionaries listing pertinent information about
@@ -163,11 +171,17 @@ def list_artifacts_for_user(user_id):
     :returns: List of dictionaries containing pertinent info.
     """
     artifacts = []
-    for artifact_id, artifact_uuid, artifact_name in _list_artifacts_for_user(user_id):
-        artifacts.append(return_artifact_details(artifact_id, artifact_name, artifact_uuid))
+    for (artifact_id,
+         artifact_uuid,
+         artifact_name) in _list_artifacts_for_user(user_id):
+        artifacts.append(return_artifact_details(artifact_id,
+                                                 artifact_name,
+                                                 artifact_uuid))
     return artifacts
 
 def return_artifact_details(artifact_id, artifact_name="", artifact_uuid=""):
+    """
+    """
     change_dt = _get_most_recent_change(artifact_id)
     create_dt = _get_artifact_creation_date(artifact_id)
     state = _get_most_recent_artifact_state(artifact_id)
@@ -216,24 +230,36 @@ def set_deboost(hours, touch_id):
 def list_servers_in_state(state):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    servers = session.query(Artifact.uuid).filter(Touch.artifact_id == Artifact.id).filter(Touch.state_id == State.id).filter_by(name=state).all()
+    servers = (session
+               .query(Artifact.uuid)
+               .filter(Touch.artifact_id == Artifact.id)
+               .filter(Touch.state_id == State.id)
+               .filter_by(name=state).all())
     result = {}
     for server in servers:
-        result[server[3]] = ({"user_id": server[0], "touch_id": server[1], "artifact_id": server[2]})
+        result[server[3]] = ({"user_id": server[0],
+                              "touch_id": server[1],
+                              "artifact_id": server[2]})
     session.close()
     return result
 
 def get_server_name_from_id(artifact_id):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    artifact_name = session.query(Artifact.name).filter(Artifact.id == artifact_id).first()
+    artifact_name = (session
+                     .query(Artifact.name)
+                     .filter(Artifact.id == artifact_id)
+                     .first())
     session.close()
     return artifact_name
 
 def get_server_id_from_name(name):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    artifact_id = session.query(Artifact.id).filter(Artifact.uuid == name).first()[0]
+    artifact_id = (session
+                   .query(Artifact.id)
+                   .filter(Artifact.uuid == name)
+                   .first())[0]
     session.close()
     return artifact_id
 
@@ -291,16 +317,12 @@ def touch_to_add_ownership(artifact_id, user_id):
     ownership_id = create_ownership(touch_id, user_id)
     return ownership_id
 
-##############################################################################
-
 def get_server_uuid_by_id(id):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     server = session.query(Artifact.uuid).filter(Artifact.id == id).first()
     session.close()
     return server
-
-##############################################################################
 
 def touch_to_add_session_key(user_id, session_key):
     touch_id = _create_touch(user_id, None, None)
@@ -325,7 +347,13 @@ def check_token(token, artifact_id):
 def check_ownership(artifact_id, actor_id):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    our_ownership = session.query(Ownership).filter(Ownership.touch_id == Touch.id).filter(Touch.actor_id == Actor.id).filter(Actor.handle == actor_id).order_by(Touch.id.desc()).first()
+    our_ownership = (session
+                     .query(Ownership)
+                     .filter(Ownership.touch_id == Touch.id)
+                     .filter(Touch.actor_id == Actor.id)
+                     .filter(Actor.handle == actor_id)
+                     .order_by(Touch.id.desc())
+                     .first())
     session.close()
     if our_ownership is None:
         return False
@@ -342,9 +370,9 @@ def get_state_id_by_name(name):
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    state_id = session.query(State.id). \
-        filter(State.name == name). \
-        first()[0]
+    state_id = (session.query(State.id)
+                .filter(State.name == name)
+                .first())[0]
     session.close()
     return state_id
 
@@ -377,8 +405,6 @@ def check_progress(job_id):
     :returns: Progress value.
     """
     return 0
-
-##############################################################################
 
 def touch_to_add_password(actor_id, password):
     """Sets the password for a user.
@@ -474,8 +500,6 @@ def touch_to_provisioned():
 
     """
 
-##############################################################################
-
 def _create_touch(actor_id, artifact_id, state_id):
     """Add a touch to the database.
 
@@ -483,7 +507,10 @@ def _create_touch(actor_id, artifact_id, state_id):
     :param artifact_id: The artifact which is associated with the touch.
     :returns: ID of new touch.
     """
-    new_touch = Touch(actor_id=actor_id, artifact_id=artifact_id, state_id=state_id, touch_dt=datetime.now())
+    new_touch = Touch(actor_id=actor_id,
+                      artifact_id=artifact_id,
+                      state_id=state_id,
+                      touch_dt=datetime.now())
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     session.add(new_touch)
@@ -522,7 +549,13 @@ def create_ownership(touch_id, user_id):
 def check_password(username, password):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    our_password = session.query(Password).filter(Password.touch_id == Touch.id).filter(Touch.actor_id == User.id).filter(User.username == username).order_by(Touch.id.desc()).first()
+    our_password = (session
+                    .query(Password)
+                    .filter(Password.touch_id == Touch.id)
+                    .filter(Touch.actor_id == User.id)
+                    .filter(User.username == username)
+                    .order_by(Touch.id.desc())
+                    .first())
     session.close()
     if our_password is None:
         print ("No password for user")
@@ -572,8 +605,12 @@ def check_credit(actor_id):
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    credit = session.query(func.sum(Credit.credit)).filter(Credit.touch_id == Touch.id).filter(Touch.actor_id == Actor.id).filter(Actor.id == actor_id).scalar()
-
+    credit = (session
+              .query(func.sum(Credit.credit))
+              .filter(Credit.touch_id == Touch.id)
+              .filter(Touch.actor_id == Actor.id)
+              .filter(Actor.id == actor_id)
+              .scalar())
     session.close()
     return credit
 
@@ -602,9 +639,10 @@ def check_user_details(user_id):
     session = Session()
     our_user = session.query(User).filter_by(handle=user_id).first()
     session.close()
-    return {'id':our_user.id, 'username': our_user.username, 'name': our_user.name}
-
-##############################################################################
+    return {'id':our_user.id,
+            'username': our_user.username,
+            'name': our_user.name
+            }
 
 def check_state(artifact_id):
     state = _get_most_recent_artifact_state(artifact_id)
@@ -612,8 +650,6 @@ def check_state(artifact_id):
         return None
     else:
         return state[0]
-
-##############################################################################
 
 def _list_artifacts_for_user(user_id):
     """Generates a list of artifacts associated with the user_id.
@@ -623,12 +659,14 @@ def _list_artifacts_for_user(user_id):
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    servers = session.query(Artifact.id, Artifact.uuid, Artifact.name) \
-                .filter(Artifact.id == Touch.artifact_id) \
-                .filter(Touch.id == Ownership.touch_id) \
-                .filter(Ownership.user_id == Actor.id) \
-                .filter(Actor.handle == user_id) \
-                .distinct(Artifact.id).all()
+    servers = (session
+               .query(Artifact.id, Artifact.uuid, Artifact.name)
+               .filter(Artifact.id == Touch.artifact_id)
+               .filter(Touch.id == Ownership.touch_id)
+               .filter(Ownership.user_id == Actor.id)
+               .filter(Actor.handle == user_id)
+               .distinct(Artifact.id)
+               .all())
     session.close()
     return servers
 
@@ -640,7 +678,10 @@ def _get_most_recent_change(artifact_id):
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    change_dt = session.query(func.max(Touch.touch_dt)).filter(Touch.artifact_id == artifact_id).first()
+    change_dt = (session
+                 .query(func.max(Touch.touch_dt))
+                 .filter(Touch.artifact_id == artifact_id)
+                 .first())
     session.close()
     return change_dt
 
@@ -652,7 +693,10 @@ def _get_artifact_creation_date(artifact_id):
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    change_dt = session.query(func.min(Touch.touch_dt)).filter(Touch.artifact_id == artifact_id).first()
+    change_dt = (session
+                 .query(func.min(Touch.touch_dt))
+                 .filter(Touch.artifact_id == artifact_id)
+                 .first())
     session.close()
     return change_dt
 
@@ -664,6 +708,12 @@ def _get_most_recent_artifact_state(artifact_id):
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    state = session.query(ArtifactState.name).filter(Touch.artifact_id == artifact_id).filter(ArtifactState.id == Touch.state_id).filter(Touch.touch_dt != None).order_by(Touch.touch_dt.desc()).first()
+    state = (session
+             .query(ArtifactState.name)
+             .filter(Touch.artifact_id == artifact_id)
+             .filter(ArtifactState.id == Touch.state_id)
+             .filter(Touch.touch_dt != None)
+             .order_by(Touch.touch_dt.desc())
+             .first())
     session.close()
     return state
