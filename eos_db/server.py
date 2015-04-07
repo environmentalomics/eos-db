@@ -539,6 +539,7 @@ def get_latest_deboost_dt(vm_id):
     return state
 
 def get_hours_until_deboost(vm_id):
+    """ Get the number of hours until a VM is due to deboost. """
     now = datetime.now()
     deboost_dt = get_latest_deboost_dt(vm_id)[0]
     d = deboost_dt - now
@@ -562,17 +563,19 @@ def touch_to_add_node():
     """
 
     """
-
+    # FIXME: Empty, remove
 
 def touch_to_pre_provisioned():
     """
 
     """
+    # FIXME: Empty, remove.
 
 def touch_to_provisioned():
     """
 
     """
+    # FIXME: Empty, remove.
 
 def _create_touch(actor_id, artifact_id, state_id):
     """Add a touch to the database.
@@ -594,16 +597,9 @@ def _create_touch(actor_id, artifact_id, state_id):
     return new_touch_id
 
 def _create_artifact_state(state_name):
-    new_state = ArtifactState(name=state_name)
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    session.add(new_state)
-    session.commit()
-    session.close()
-    return new_state.id
-
-def create_password(touch_id, password):
-    new_password = Password(touch_id=touch_id, password=password)
+    """ Add an artifact state to the database. """
+    # FIXME: This simply must never have been used, as I appear to have written
+    # gibberish.
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     session.add(new_password)
@@ -612,6 +608,11 @@ def create_password(touch_id, password):
     return new_password.id
 
 def create_ownership(touch_id, user_id):
+    """ Add an ownership to a user. This requires a touch to have been created
+    linking the artifact to this record. """
+    # FIXME: This seems odd - ideally this should just create a touch linking
+    # artifact and user, and then add the ownership resource to it. Consider
+    # refactoring the ownership mechanism.
     new_ownership = Ownership(touch_id=touch_id, user_id=user_id)
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
@@ -621,6 +622,8 @@ def create_ownership(touch_id, user_id):
     return new_ownership.id
 
 def check_password(username, password):
+    """ Returns a Boolean to describe whether the username and password
+    combination is valid. """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     our_password = (session
@@ -719,6 +722,8 @@ def check_user_details(user_id):
             }
 
 def check_state(artifact_id):
+    """ Return None is the artifact has no state assignned to it. Otherwise,
+    return the most recent state. """
     state = _get_most_recent_artifact_state(artifact_id)
     if state is None:
         return None
