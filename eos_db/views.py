@@ -5,22 +5,16 @@ API. Modifications requests to the database are mediated through functions in
 the "server" module.
 """
 
-##############################################################################
-
 import json, uuid, bcrypt
-
+import hashlib, base64, random
 from pyramid.response import Response
 from pyramid.view import view_config
 from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented, HTTPUnauthorized, HTTPForbidden, HTTPNotFound
-import hashlib, base64, random
 from eos_db import server
-
-##############################################################################
-
-# Home View
 
 @view_config(request_method="GET", route_name='home', renderer='json')
 def home_view(request):
+    """ Return a list of all valid API calls. """
     call_list = {"Valid API Call List":{
                               "Setup States": "/setup_states",
                               "Sessions": "/sessions",
@@ -65,20 +59,23 @@ def home_view(request):
 @view_config(request_method="OPTIONS", route_name='server_pre_deboost', renderer='json')
 @view_config(request_method="OPTIONS", route_name='server_prepare', renderer='json')
 @view_config(request_method="OPTIONS", route_name='server_specification', renderer='json')
-
 def options(request):
+    """ Return the OPTIONS header. """
+    # FIXME: This is important for enabling CORS, although under certain
+    # circumstances the browser doesn' appear to need it. Might be worth
+    # examining why.
     return None
-
-# Views for setting up test databases
 
 @view_config(request_method="POST", route_name='setup', renderer='json', permission="use")
 def setup(request):
+    """ Deploy tables into test database. """
     server.choose_engine("SQLite")
     server.deploy_tables()
     return None
 
 @view_config(request_method="POST", route_name='setup_states', renderer='json', permission="use")
 def setup_states(request):
+    """ Deploy list of valid artifact states into database. """
     server.setup_states(['Starting',
                          'Started',
                          'Stopping',
@@ -92,22 +89,21 @@ def setup_states(request):
                          'Restarting'])
     return None
 
-# User-related API calls - All users
-
 @view_config(request_method="GET", route_name='users', renderer='json', permission="use")
 def retrieve_users(request):
+    # FIXME: Do these need to be here? Or are they worth having as a placeholder?
     return HTTPNotImplemented()
-
-# User-related API calls - Individual users
 
 @view_config(request_method="PUT", route_name='user', renderer='json', permission="use")
 def create_user(request):
+    """ Create a user in the database. """
     newname = server.create_user(request.POST['type'], request.POST['handle'], request.POST['name'], request.matchdict['name'])
     return newname
 
 @view_config(request_method="GET", route_name='user', renderer='json', permission="use")
 def retrieve_user(request):
     """Return account details for a user.
+
     :param actor_id: The user we are interested in.
     :returns JSON object containing user table data and credit balance.
     """
@@ -130,8 +126,6 @@ def delete_user(request):
     response = HTTPNotImplemented()
     return response
 
-# User password actions
-
 @view_config(request_method="PUT", route_name='user_password', renderer='json', permission="administer")
 def create_user_password(request):
     # Add salt and hash
@@ -152,14 +146,10 @@ def retrieve_user_password(request):
     print (bapauth)
     return True if (bapauth == username) else None
 
-# Retrieve activity log from recent touches
-
 @view_config(request_method="GET", route_name='user_touches', renderer='json', permission="use")
 def retrieve_user_touches(request):
     name = request.matchdict['name']
     return name
-
-# User credit addition, querying etc.
 
 @view_config(request_method="POST", route_name='user_credit', renderer='json', permission="administrate")
 def create_user_credit(request):
@@ -199,10 +189,6 @@ def retrieve_user_credit(request):
                          'credit_balance': int(credits)}, sort_keys=True)
     return output
 
-##############################################################################
-
-# Server-related API calls - All Servers
-
 @view_config(request_method="GET", route_name='servers', renderer='json', permission="use")
 def retrieve_servers(request):
     print ("Servers for user: " + request.authenticated_userid)
@@ -215,8 +201,6 @@ def retrieve_servers_in_state(request):
     server_id = server.list_server_in_state(request.GET['state'])
     server_uuid = server.get_server_uuid_by_id(server_id)
     return {"artifact_id": server_id, "artifact_uuid":server_uuid}
-
-# Server-related API calls - Individual Servers
 
 @view_config(request_method="PUT", route_name='server', renderer='json', permission="use")
 def create_server(request):
@@ -255,8 +239,6 @@ def create_server_owner(request):
 def get_server_owner(request):
     return HTTPNotImplemented()
 
-# State changes
-
 @view_config(request_method="POST", route_name='server_start', renderer='json', permission="use")
 def start_server(request):
     """Put a server into the "pre-start" status.
@@ -264,6 +246,7 @@ def start_server(request):
     :param vm_id: ID of VApp which we want to start.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
+    # FIXME: Should be able to roll these state change views up into a single call.
     if server.check_token(request.headers['eos_token'], request.matchdict['name']):
         newname = server.touch_to_state(request.matchdict['name'], "Starting")
         return newname
@@ -277,6 +260,7 @@ def restart_server(request):
     :param vm_id: ID of VApp which we want to start.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
+    # FIXME: Should be able to roll these state change views up into a single call.
     touch_id = server.touch_to_state(request.matchdict['name'], "Restarting")
     return touch_id
 
@@ -287,6 +271,7 @@ def stop_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
+    # FIXME: Should be able to roll these state change views up into a single call.
     touch_id = server.touch_to_state(request.matchdict['name'], "Stopping")
     return touch_id
 
@@ -297,6 +282,7 @@ def prepare_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
+    # FIXME: Should be able to roll these state change views up into a single call.
     touch_id = server.touch_to_state(request.matchdict['name'], "Preparing")
     return touch_id
 
@@ -318,6 +304,7 @@ def pre_deboost_server(request):
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
+    # FIXME: Should be able to roll these state change views up into a single call.
     touch_id = server.touch_to_state(request.matchdict['name'], "Pre_Deboosting")
     return touch_id
 
@@ -329,6 +316,8 @@ def boost_server(request):
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
     touch_id = server.touch_to_state(request.matchdict['name'], "Boosting")  # Boost Server
+    # FIXME: I'd commented this part of the code out to work on other things.
+    # Should just be decommentable.
 
     # Now check if boost was successful, set deboost and remove credits accordingly.
     # if touch_id:
@@ -400,25 +389,21 @@ def retrieve_job_progress(request):
     newname = server.check_progress(request.matchdict['job'])
     return newname
 
-# Retrieve activity log from recent touches
-
 @view_config(request_method="GET", route_name='server_touches', renderer='json', permission="use")
 def retrieve_server_touches(request):
+    """ Retrieve activity log from recent touches. """
+    # FIXME - Clearly this hasn't been implemented.
     name = request.matchdict['name']
     return name
-
-# Server specification calls
 
 @view_config(request_method="POST", route_name='server_specification', renderer='json', permission="use")
 def set_server_specification(request):
     name = request.matchdict['name']
     vm_id = server.get_server_id_from_name(name)
-
     # Filter for bad requests
-
     # FIXME - check against valid machine states in settings.py
-
     if (request.POST['cores'] not in ['1', '2', '4', '16']) or (request.POST['ram'] not in ['1', '4', '8', '16', '500']):
+        # FIXME - This really shouldn't be hardcoded.
         return HTTPBadRequest()
     else:
         server.touch_to_add_specification(vm_id, request.POST['cores'], request.POST['ram'])
@@ -426,14 +411,8 @@ def set_server_specification(request):
 
 @view_config(request_method="GET", route_name='server_specification', renderer='json', permission="use")
 def get_server_specification(request):
+    """ Get the specification of a machine. """
     name = request.matchdict['name']
     vm_id = server.get_server_id_from_name(name)
     cores, ram = server.get_latest_specification(vm_id)
     return {"cores":cores, "ram":ram}
-
-
-
-##############################################################################
-
-# Session-related API calls TODO
-
