@@ -132,10 +132,7 @@ def delete_user(request):
 
 @view_config(request_method="PUT", route_name='user_password', renderer='json', permission="administer")
 def create_user_password(request):
-    # This operation seems a bit extraneous, given that we have a
-    # touch_to_add_password routine. Think the name lookup can be rolled up
-    # into the subroutine that this calls. Otherwise it's just a wrapper that
-    # does a name lookup.
+    """ Creates a password for the user given. """
     username = request.matchdict['name']
     actor_id = server.get_user_id_from_name(username)
     newname = server.touch_to_add_password(actor_id, request.POST['password'])
@@ -199,6 +196,9 @@ def retrieve_user_credit(request):
 
 @view_config(request_method="GET", route_name='servers', renderer='json', permission="use")
 def retrieve_servers(request):
+    """
+    Lists all artifacts related to a given user.
+    """
     print ("Servers for user: " + request.authenticated_userid)
     server_list = server.list_artifacts_for_user(request.authenticated_userid)
     print (server_list)
@@ -206,17 +206,26 @@ def retrieve_servers(request):
 
 @view_config(request_method="GET", route_name='state', renderer='json', permission="use")
 def retrieve_servers_in_state(request):
+    """
+    Lists all servers in a given state.
+    """
     server_id = server.list_server_in_state(request.GET['state'])
     server_uuid = server.get_server_uuid_by_id(server_id)
     return {"artifact_id": server_id, "artifact_uuid":server_uuid}
 
 @view_config(request_method="PUT", route_name='server', renderer='json', permission="use")
 def create_server(request):
+    """
+    Creates a new artifact record in the database.
+    """
     newname = server.create_appliance(request.matchdict['name'], request.POST['uuid'])
     return newname
 
 @view_config(request_method="GET", route_name='server', renderer='json', permission="use")
 def retrieve_server(request):
+    """
+    Gets artifact details from the server.
+    """
     name = request.matchdict['name']
     server_id = server.get_server_id_from_name(name)
     server_details = server.return_artifact_details(server_id)
@@ -224,27 +233,40 @@ def retrieve_server(request):
 
 @view_config(request_method="GET", route_name='server_by_id', renderer='json', permission="use")
 def retrieve_server_by_id(request):
+    """
+    Gets artifact details, but uses the internal system ID.
+    """
     id = request.matchdict['name']
     server_details = server.return_artifact_details(id)
     return server_details
 
 @view_config(request_method="PATCH", route_name='server', renderer='json', permission="use")
 def update_server(request):
+    # FIXME: Not implemented. Do we want this to be implemented?
     response = HTTPNotImplemented()
     return response
 
 @view_config(request_method="DELETE", route_name='server', renderer='json', permission="use")
 def delete_server(request):
+    # FIXME: Not implemented. Again, this needs thought. Probably logical
+    # deletion through a "deleted" flag.
     response = HTTPNotImplemented()
     return response
 
 @view_config(request_method="PUT", route_name='server_owner', renderer='json', permission="use")
 def create_server_owner(request):
+    """ Calls touch_to_add_ownership to add an owner to the server. """
+    # FIXME: There is the problem of servers being able to have multiple
+    # owners in the current system. Again, we may need a logical deletion
+    # flag. On reflection, I'd like to suggest that we add a logical deletion
+    # flag to the Resource class, as it'll be inherited by all resources,
+    # and solves multiple problems in one place.
     newname = server.touch_to_add_ownership(request.matchdict['name'], request.POST['actor_id'])
     return newname
 
 @view_config(request_method="GET", route_name='server_owner', renderer='json', permission="use")
 def get_server_owner(request):
+    # Not implemented. Check if necessary.
     return HTTPNotImplemented()
 
 @view_config(request_method="POST", route_name='server_start', renderer='json', permission="use")
