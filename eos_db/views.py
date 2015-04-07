@@ -118,17 +118,24 @@ def retrieve_user(request):
 
 @view_config(request_method="PATCH", route_name='user', renderer='json', permission="use")
 def update_user(request):
+    # FIXME: Not implemented.
     response = HTTPNotImplemented()
     return response
 
 @view_config(request_method="DELETE", route_name='user', renderer='json', permission="use")
 def delete_user(request):
+    # FIXME: Not implemented. Some thought needs to go into this. I think a
+    # deletion flag would be appropriate, but this will involve changing quite
+    # a number of queries.
     response = HTTPNotImplemented()
     return response
 
 @view_config(request_method="PUT", route_name='user_password', renderer='json', permission="administer")
 def create_user_password(request):
-    # Add salt and hash
+    # This operation seems a bit extraneous, given that we have a
+    # touch_to_add_password routine. Think the name lookup can be rolled up
+    # into the subroutine that this calls. Otherwise it's just a wrapper that
+    # does a name lookup.
     username = request.matchdict['name']
     actor_id = server.get_user_id_from_name(username)
     newname = server.touch_to_add_password(actor_id, request.POST['password'])
@@ -148,6 +155,7 @@ def retrieve_user_password(request):
 
 @view_config(request_method="GET", route_name='user_touches', renderer='json', permission="use")
 def retrieve_user_touches(request):
+    # FIXME - Not implemented.
     name = request.matchdict['name']
     return name
 
@@ -398,10 +406,18 @@ def retrieve_server_touches(request):
 
 @view_config(request_method="POST", route_name='server_specification', renderer='json', permission="use")
 def set_server_specification(request):
+    """ Set number of cores and amount of RAM for a VM. These numbers should
+    only match the given specification types listed below. """
+
+    # FIXME: This also needs to look up the other servers currently boosted
+    # and return a bad request if there is not enough capacity.
+
     name = request.matchdict['name']
     vm_id = server.get_server_id_from_name(name)
+
     # Filter for bad requests
     # FIXME - check against valid machine states in settings.py
+
     if (request.POST['cores'] not in ['1', '2', '4', '16']) or (request.POST['ram'] not in ['1', '4', '8', '16', '500']):
         # FIXME - This really shouldn't be hardcoded.
         return HTTPBadRequest()
@@ -411,7 +427,8 @@ def set_server_specification(request):
 
 @view_config(request_method="GET", route_name='server_specification', renderer='json', permission="use")
 def get_server_specification(request):
-    """ Get the specification of a machine. """
+    """ Get the specification of a machine. Returns RAM in GB and number of
+    cores in a JSON object."""
     name = request.matchdict['name']
     vm_id = server.get_server_id_from_name(name)
     cores, ram = server.get_latest_specification(vm_id)
