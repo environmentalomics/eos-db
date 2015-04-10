@@ -1,5 +1,5 @@
 """Tests for VM actions. This test suite uses webtest to interface with the
-WSGI interface normally served by Waitress. 
+WSGI interface normally served by Waitress.
 
 """
 

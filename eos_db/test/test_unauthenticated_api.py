@@ -3,19 +3,26 @@
 """
 
 import unittest
+import os
 from webtest import TestApp
 # Note that pyramid.paster does work in Py3, since PasteDeploy
-# is ported.
+# is ported, though most of Paste is not.
 from pyramid.paster import get_app
 
 from eos_db import server
+
+# Normally I'd frown upon any code that discovers it's own location, but in this
+# case it makes sense to use test.ini from the same folder as the test module.
+test_ini = os.path.join(os.path.dirname(__file__), 'test.ini')
 
 class TestUnAuth(unittest.TestCase):
     """Tests to see that the server responds as expected to non-authorized requests.
     """
     def setUp(self):
-        """Launch pserve using webtest with test settings"""
-        self.myapp = get_app('../../test.ini')
+        """Launch pserve/waitress using webtest with test settings.
+           Fresh for every test, though it shouldn't matter.
+        """
+        self.myapp = get_app(test_ini)
         self.testapp = TestApp(self.myapp)
 
         #No auth
@@ -74,8 +81,9 @@ class TestUnAuth(unittest.TestCase):
         self.assertEqual(response.headers.get('WWW-Authenticate', 'empty'), 'Basic realm="eos_db"')
 
     def test_homepage_post(self):
-        """Post to home page returns a 404 not found
-           ?? Is that right ??
+        """Post to home page returns a 404 not found, as no endpoint is
+           defined for a POST to this URL.
+           #FIXME - should really return a 405
         """
         app = TestApp(self.myapp)
 

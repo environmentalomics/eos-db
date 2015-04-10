@@ -1,10 +1,10 @@
 """Tests for DB API behaviour when logged in as administrator
 
 """
+import os
 import unittest, json
 from eos_db import server
 from webtest import TestApp
-# FIXME - do not rely on pyramid.paster for this
 from pyramid.paster import get_app
 
 STATE_LIST = ['Starting',
@@ -18,13 +18,16 @@ STATE_LIST = ['Starting',
             'Prepared',
             'Boosting']
 
+# Depend on test.ini in the same dir as thsi file.
+test_ini = os.path.join(os.path.dirname(__file__), 'test.ini')
+
 class TestVMAPI(unittest.TestCase):
     """Tests API functions associated with VM actions.
        Note that all tests are in-process, we don't actually start a http server.
     """
     def setUp(self):
         """Launch pserve using webtest with test settings"""
-        self.appconf = get_app('../../test.ini')
+        self.appconf = get_app(test_ini)
         self.app = TestApp(self.appconf)
 
         # Punch in new administrator account with direct server call
