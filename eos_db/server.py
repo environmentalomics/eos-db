@@ -16,7 +16,8 @@ from eos_db.models import Base
 DB = None
 try:
     from eos_db.settings import DBDetails as DB
-except:  # FIXME: What the actual heck?! Bare except statement. :-D
+except:
+    # This bare except statement is legit.
     # If no settings file is supplied, connect to the database eos_db without
     # a username or password - ie. rely on PostgreSQL ident auth.
     pass
@@ -75,26 +76,19 @@ def deploy_tables():
 def setup_states(state_list):
     """ Write the list of valid states to the database. """
     # FIXME: Make sure states must be distinct
+    # FIXME2: Can't we do this automagically???
     for state in state_list:
-        _create_artifact_state(state)
+        create_artifact_state(state)
 
 def create_user(type, handle, name, username):
     """Create a new user record. """
-    # FIXME: A lot of these "touch_to_add" and "create" calls share very similar
-    # boilerplate. This file could be significantly reduced in size by the
-    # judicious use of decorators.
     Base.metadata.create_all(engine)
-    new_user = User(name=name, username=username, uuid=handle, handle=handle)
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    session.add(new_user)
-    session.commit()
-    session.close()
-    return new_user.id
+    return _create_thingy(User(name=name, username=username, uuid=handle, handle=handle))
 
 def touch_to_add_user_group(username, group):
     """ Adds a touch to the database, then links it to a new user group
-    record. """
+        record.
+    """
     user_id = get_user_id_from_name(username)
     touch_id = _create_touch(user_id, None, None)
     create_group_membership(touch_id, group)
@@ -102,14 +96,11 @@ def touch_to_add_user_group(username, group):
 
 def create_group_membership(touch_id, group):
     """ Create a new group membership resource. """
+    # FIXME - touch_id was unused, so clearly this was broken.  Needs testing!!!
+    # FIXME2 - this is only ever used by the function above so fold the code in.
     Base.metadata.create_all(engine)
-    new_membership = GroupMembership(group=group)
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    session.add(new_membership)
-    session.commit()
-    session.close()
-    return new_membership.id
+    return _create_thingy(GroupMembership(group=group))
+    #return _create_thingy(GroupMembership(group=group, touch_id=touch_id))
 
 def get_user_group(username):
     """ Get the group associated with a given username. """
@@ -132,24 +123,25 @@ def create_appliance(name, uuid):
     """ Create a new VApp """  # FIXME: We shoehorn VMs into the Vapp record.
     # VMs should go into the "Node" object.
     Base.metadata.create_all(engine)
-    new_appliance = Appliance(uuid=uuid, name=name)
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    session.add(new_appliance)
-    session.commit()
-    session.close()
-    return new_appliance.id
+    return _create_thingy(Appliance(uuid=uuid, name=name))
 
 def create_artifact_state(state_name):
     """ Create a new artifact state. ArtifactState subclasses State. See the
     relevant docs in the model. """
-    new_artifact_state = ArtifactState(name=state_name)
+    return _create_thingy(ArtifactState(name=state_name))
+
+def _create_thingy(sql_entity):
+    """Internal call that holds the boilerplate for putting a new SQLAlchemy object
+       into the database.  BC suggested this should be a decorator but I don't think
+       that aids legibility.
+    """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    session.add(new_artifact_state)
+    session.add(sql_entity)
     session.commit()
     session.close()
-    return new_artifact_state.id
+    return sql_entity.id
+
 
 def change_node_state(node_id, state_id):
     """
@@ -223,11 +215,8 @@ def set_deboost(hours, touch_id):
     deboost_dt = datetime.now()
     deboost_dt += timedelta(hours=hours)
     new_deboost = Deboost(deboost_dt=deboost_dt, touch_id=touch_id)
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    session.add(new_deboost)
-    session.commit()
-    session.close()
+
+    return _add_thingy(new_deboost)
 
 def list_servers_in_state(state):
     """ Return a list of servers in the state specified. """
@@ -378,27 +367,9 @@ def get_server_uuid_by_id(id):
     session.close()
     return server
 
-def touch_to_add_session_key(user_id, session_key):
-    """ Add a session key resource to a user."""
-    # FIXME - This can be removed - it shouldn't have any purpose in the
-    # current system.
-    touch_id = _create_touch(user_id, None, None)
-    session_id = create_session_key(touch_id, session_key)
-    return session_id
-
-def create_session_key(touch_id, session_key):
-    # FIXME - This can be removed - it shouldn't have any purpose in the
-    # current system.
-    new_session_key = SessionKey(touch_id=touch_id, session_key=session_key)
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    session.add(new_session_key)
-    session.commit()
-    session.close()
-    return new_session_key.id
-
 def check_token(token, artifact_id):
     # FIXME - This was built for the old auth philosophy and has to be altered.
+    # It's called only once in views.py
     """Check if artifact belongs to owner of token"""
     # token_actor_id = get_token_owner(token)
     # return check_ownership(artifact_id, token_actor_id)
@@ -588,24 +559,11 @@ def _create_touch(actor_id, artifact_id, state_id):
                       artifact_id=artifact_id,
                       state_id=state_id,
                       touch_dt=datetime.now())
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    session.add(new_touch)
-    session.commit()
-    new_touch_id = new_touch.id
-    session.close()
-    return new_touch_id
+    return _add_thingy(new_touch)
 
-def _create_artifact_state(state_name):
-    """ Add an artifact state to the database. """
-    # FIXME: This simply must never have been used, as I appear to have written
-    # gibberish.
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    session.add(new_password)
-    session.commit()
-    session.close()
-    return new_password.id
+def create_password(touch_id, password):
+    """ Create a Password, which knows how to BCrypt itself. """
+    return _add_thingy(Password(touch_id=touch_id, password=password))
 
 def create_ownership(touch_id, user_id):
     """ Add an ownership to a user. This requires a touch to have been created
@@ -614,12 +572,7 @@ def create_ownership(touch_id, user_id):
     # artifact and user, and then add the ownership resource to it. Consider
     # refactoring the ownership mechanism.
     new_ownership = Ownership(touch_id=touch_id, user_id=user_id)
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    session.add(new_ownership)
-    session.commit()
-    session.close()
-    return new_ownership.id
+    return _add_thingy(new_ownership)
 
 def check_password(username, password):
     """ Returns a Boolean to describe whether the username and password
@@ -648,13 +601,7 @@ def _create_credit(touch_id, credit):
     :param credit: An integer from -2147483648 to +2147483647.
     :returns: ID of newly created credit resource.
     """
-    new_credit = Credit(touch_id=touch_id, credit=credit)
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    session.add(new_credit)
-    session.commit()
-    session.close()
-    return new_credit.id
+    return _add_thingy(Credit(touch_id=touch_id, credit=credit))
 
 def _create_specification(touch_id, cores, ram):
     """Creates a credit resource.
@@ -664,13 +611,7 @@ def _create_specification(touch_id, cores, ram):
     :param ram: An integer - GB of RAM for machine.
     :returns: ID of newly created specification resource.
     """
-    new_specification = Specification(touch_id=touch_id, cores=cores, ram=ram)
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    session.add(new_specification)
-    session.commit()
-    session.close()
-    return new_specification.id
+    return _add_thingy(Specification(touch_id=touch_id, cores=cores, ram=ram))
 
 
 def check_credit(actor_id):
