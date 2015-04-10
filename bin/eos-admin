@@ -28,6 +28,12 @@ from getpass import getpass
 from traceback import print_exc
 from eos_db import server
 
+# If we need to debug SQLAlchemy.
+# See http://docs.sqlalchemy.org/en/latest/core/engines.html#configuring-logging
+# import logging
+# logging.basicConfig(level=logging.WARN)
+# logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
+
 arg = sys.argv[1:]
 
 if len(arg) == 0:
@@ -36,6 +42,7 @@ if len(arg) == 0:
 # This only works with PostgreSQL??  Yes, because SQLite in-memory DB
 # will vanish as soon as the program quits.
 server.choose_engine("PostgreSQL")
+
 
 def by_user_getter(username):
     """Returns a pairs of (machine_name, machine_id) for this user
@@ -99,17 +106,21 @@ if arg[0] == 'adduser':
         password = arg[2]
         realname = arg[3] if arg[3:] else username
     except IndexError:
-        sys.exit("Ensure you enter a username and password.")
+        sys.exit("Failed. Ensure you enter a username and password.")
 
-    id = server.create_user("user", username, realname, username)
-    print ("New user created with id %s" % id)
-    server.touch_to_add_password(id, password)
+    try:
+        id = server.create_user("user", username, realname, username)
+        print ("New user created with id %s" % id)
+        server.touch_to_add_password(id, password)
 
-    #Sanity check...
-    if server.check_password(username, password):
-        print("User %s password set." % (username))
-    else:
-        print("Failed to set the password!")
+        #Sanity check...
+        if server.check_password(username, password):
+            print("User %s password set." % (username))
+        else:
+            print("Failed to set the password!")
+    except Exception as e:
+        #Suppress stack trace.
+        sys.exit("Error: " + str(e))
 
 elif arg[0] == 'addvm':
     print ("Adding vm...")
@@ -117,7 +128,7 @@ elif arg[0] == 'addvm':
     try:
         username = arg[1]
     except IndexError:
-        sys.exit("Ensure you enter at least a username.")
+        sys.exit("Failed. Ensure you enter at least a username.")
 
     try:
         user_id = server.get_user_id_from_name(username)
@@ -154,7 +165,7 @@ elif arg[0] == 'addcredit':
         username = arg[1]
         credit = int(arg[2])
     except (IndexError, ValueError):
-        sys.exit("Specify a user name and integer credit amount.")
+        sys.exit("Failed. Specify a user name and integer credit amount.")
 
     try:
         user_id = server.get_user_id_from_name(username)
@@ -173,7 +184,7 @@ elif arg[0] == 'changepwd':
         username = arg[1]
         password = arg[2] if arg[2:] else None
     except IndexError:
-        sys.exit("No username or password specified.")
+        sys.exit("Failed. No username or password specified.")
 
     try:
         user_id = server.get_user_id_from_name(username)
