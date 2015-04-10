@@ -59,11 +59,13 @@ class TestUnAuth(unittest.TestCase):
         """If I ask for a list of servers, and give a wrong username+password, I
            should get back a 403
         """
+        #Do this or else the password lookup throws an error.
+        server.deploy_tables()
+
         app = self.testapp
         app.authorization = ('Basic', ('baduser', 'badpassword'))
 
         response = app.get('/servers', status=401)
-
         self.assertEqual(response.headers.get('WWW-Authenticate', 'empty'), 'Basic realm="eos_db"')
 
     def test_servers_badpass(self):
