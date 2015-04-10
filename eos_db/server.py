@@ -34,6 +34,10 @@ def choose_engine(enginestring):
     Create a connection to a database. If Postgres is selected, this will
     connect to the database specified in the settings.py file. If SQLite is
     selected, then the system will use an in-memory SQLite database.
+    As stated in
+    http://docs.sqlalchemy.org/en/latest/core/engines.html#configuring-logging
+    one should only use echo=True for blanket debugging.  Use the logger
+    settings for sqlalchemy.engine instead.
     """
     global engine
 
@@ -45,13 +49,13 @@ def choose_engine(enginestring):
                                       DB.password,
                                       DB.host,
                                       DB.database),
-                                   echo=True)
+                                   echo=False)
         elif DB:
             engine = create_engine('postgresql:///%s'
                                    % (DB.database),
-                                   echo=True)
+                                   echo=False)
         else:
-            engine = create_engine('postgresql:///eos_db', echo=True)
+            engine = create_engine('postgresql:///eos_db', echo=False)
 
     elif enginestring == "SQLite":
         engine = create_engine('sqlite://', echo=False)
@@ -216,7 +220,7 @@ def set_deboost(hours, touch_id):
     deboost_dt += timedelta(hours=hours)
     new_deboost = Deboost(deboost_dt=deboost_dt, touch_id=touch_id)
 
-    return _add_thingy(new_deboost)
+    return _create_thingy(new_deboost)
 
 def list_servers_in_state(state):
     """ Return a list of servers in the state specified. """
@@ -559,11 +563,11 @@ def _create_touch(actor_id, artifact_id, state_id):
                       artifact_id=artifact_id,
                       state_id=state_id,
                       touch_dt=datetime.now())
-    return _add_thingy(new_touch)
+    return _create_thingy(new_touch)
 
 def create_password(touch_id, password):
     """ Create a Password, which knows how to BCrypt itself. """
-    return _add_thingy(Password(touch_id=touch_id, password=password))
+    return _create_thingy(Password(touch_id=touch_id, password=password))
 
 def create_ownership(touch_id, user_id):
     """ Add an ownership to a user. This requires a touch to have been created
@@ -572,7 +576,7 @@ def create_ownership(touch_id, user_id):
     # artifact and user, and then add the ownership resource to it. Consider
     # refactoring the ownership mechanism.
     new_ownership = Ownership(touch_id=touch_id, user_id=user_id)
-    return _add_thingy(new_ownership)
+    return _create_thingy(new_ownership)
 
 def check_password(username, password):
     """ Returns a Boolean to describe whether the username and password
@@ -601,7 +605,7 @@ def _create_credit(touch_id, credit):
     :param credit: An integer from -2147483648 to +2147483647.
     :returns: ID of newly created credit resource.
     """
-    return _add_thingy(Credit(touch_id=touch_id, credit=credit))
+    return _create_thingy(Credit(touch_id=touch_id, credit=credit))
 
 def _create_specification(touch_id, cores, ram):
     """Creates a credit resource.
@@ -611,7 +615,7 @@ def _create_specification(touch_id, cores, ram):
     :param ram: An integer - GB of RAM for machine.
     :returns: ID of newly created specification resource.
     """
-    return _add_thingy(Specification(touch_id=touch_id, cores=cores, ram=ram))
+    return _create_thingy(Specification(touch_id=touch_id, cores=cores, ram=ram))
 
 
 def check_credit(actor_id):
