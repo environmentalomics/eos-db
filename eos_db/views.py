@@ -12,6 +12,21 @@ from pyramid.view import view_config
 from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented, HTTPUnauthorized, HTTPForbidden, HTTPNotFound
 from eos_db import server
 
+class PermissionMap():
+    """This is passed to pyramid.config.Configurator in __init__.py,
+       and defines the permissions attributed to each group. """
+
+    __acl__ = [(Allow, Everyone,               'login'),
+               (Allow, 'group:users',          'use'),
+               (Allow, 'group:agents',         'use'),
+               (Allow, 'group:agents',         'act'),
+               (Allow, 'group:administrators', 'use'),
+               (Allow, 'group:administrators', 'act'),
+               (Allow, 'group:administrators', 'administer')]
+    def __init__(self, request):
+        """ No-operations here. """
+        pass
+
 @view_config(request_method="GET", route_name='home', renderer='json')
 def home_view(request):
     """ Return a list of all valid API calls. """
@@ -68,8 +83,8 @@ def options(request):
 
 @view_config(request_method="POST", route_name='setup', renderer='json', permission="use")
 def setup(request):
-    """ Deploy tables into test database. """
-    server.choose_engine("SQLite")
+    """ Deploy tables into a database. """
+    #server.choose_engine("SQLite")
     server.deploy_tables()
     return None
 

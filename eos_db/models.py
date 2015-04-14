@@ -16,34 +16,16 @@ acted upon by "Touches" being made to the artifact, in order to apply
 
 """
 
-import os  # FIXME Unused import
-from sqlalchemy import create_engine  # FIXME Unused import
 from sqlalchemy import Column, Integer, String, DateTime, CHAR, ForeignKey
-from sqlalchemy import UniqueConstraint, CheckConstraint  # FIXME Unused import
+from sqlalchemy import UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from pyramid.security import Allow, Everyone
 from bcrypt import hashpw, gensalt
 
-# FIXME - Base here defined with an invalid name (caps B)
-
-Base = declarative_base()  # The standard base object for declaratively
-                            # instantiated data models.
-
-class RootFactory(object):
-    """This is passed to pyramid.config.Configuratore in __init__.py,
-       and defines the persissions attributed to each group. """
-
-    __acl__ = [(Allow, Everyone, 'login'),
-               (Allow, 'group:users', 'use'),
-               (Allow, 'group:agents', 'use'),
-               (Allow, 'group:agents', 'act'),
-               (Allow, 'group:administrators', 'use'),
-               (Allow, 'group:administrators', 'act'),
-               (Allow, 'group:administrators', 'administer')]
-    def __init__(self, request):
-        """ No-operations here. """
-        pass
+"""The standard base object for declaratively instantiated data models.
+"""
+Base = declarative_base()
 
 class Actor(Base):
     """ An actor is any entity which is permitted to make an action. In the
@@ -254,8 +236,6 @@ class Password(Resource):
         kwargs['password'] = hashpw(kwargs['password'].encode(),
                                     gensalt()).decode()
         super(self.__class__, self).__init__(**kwargs)
-        # FIXME: Resource needs to inherit from object to make use of "super"
-        # here best-practice compliant.
 
     def check(self, candidate):
         """Checks if a candidate password matches the stored crypt-ed password.

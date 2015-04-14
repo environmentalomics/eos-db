@@ -55,7 +55,7 @@ def add_cookie_callback(event):
 def groupfinder(userid, request):
     """ Return the user group associated with the userid. This uses a server
     function to check which group a user has been associated with. The valid
-    groups are stored in models.RootFactory """
+    groups are stored in views.PermissionsMap """
 
     # FIXME - server not called correctly. Is this even being called?
     # Also groupfinder doesn't use the request argument any more. Can be
@@ -120,7 +120,7 @@ def main(global_config, **settings):
                                      realm="eos_db")
     config = Configurator(settings=settings,
                           authentication_policy=hap,
-                          root_factory='eos_db.models.RootFactory')
+                          root_factory='eos_db.views.PermissionsMap')
 
     config.add_subscriber(add_cors_headers_response_callback, NewRequest)
     config.add_subscriber(add_cookie_callback, NewRequest)
