@@ -88,20 +88,13 @@ def setup(request):
     server.deploy_tables()
     return None
 
+# FIXME - permission=admisister, surely??  And for the one above.
 @view_config(request_method="POST", route_name='setup_states', renderer='json', permission="use")
 def setup_states(request):
-    """ Deploy list of valid artifact states into database. """
-    server.setup_states(['Starting',
-                         'Started',
-                         'Stopping',
-                         'Stopped',
-                         'Pre_Deboosting',
-                         'Pre_Deboosted',
-                         'Preparing',
-                         'Prepared',
-                         'Boosting',
-                         'Boosted',
-                         'Restarting'])
+    """ Deploy list of valid artifact states into database. The states are in server.py
+        and may be supplemented in settings.py
+    """
+    server.setup_states()
     return None
 
 @view_config(request_method="GET", route_name='users', renderer='json', permission="use")

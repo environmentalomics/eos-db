@@ -1,5 +1,6 @@
 """Tests for DB API behaviour when logged in as administrator
 
+   $ ~/eoscloud-venv/bin/python3 -m unittest eos_db.test.test_unauthenticated_api
 """
 import os
 import unittest, json
@@ -7,7 +8,8 @@ from eos_db import server
 from webtest import TestApp
 from pyramid.paster import get_app
 
-STATE_LIST = ['Starting',
+STATES_TO_TEST = [
+            'Starting',
             'Stopping',
             'Restarting',
             'Pre_Deboosting',
@@ -30,7 +32,6 @@ class TestVMAPI(unittest.TestCase):
         self.appconf = get_app(test_ini)
         self.app = TestApp(self.appconf)
 
-        # Punch in new administrator account with direct server call
 
         server.choose_engine("SQLite")  # Sets global var "engine" - in the
                                         # case of SQLite this is a fresh RAM
@@ -39,8 +40,8 @@ class TestVMAPI(unittest.TestCase):
         # Switch to API basic auth with created account
 
 
-        # Create admin user. This will implicitly generate the tables.
-
+        # Punch in new administrator account with direct server call
+        # This will implicitly generate the tables.
         server.create_user("user", "administrator", "administrator", "administrator")
         server.touch_to_add_user_group("administrator", "administrators")
         server.touch_to_add_password(1, "adminpass")
@@ -210,7 +211,7 @@ class TestVMAPI(unittest.TestCase):
 
         self.create_server("testserver")
 
-        for state in STATE_LIST:
+        for state in STATES_TO_TEST:
             push_to_state(state)
             current_state = get_state()
             assert current_state == state

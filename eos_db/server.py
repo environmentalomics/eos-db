@@ -18,8 +18,14 @@ try:
     from eos_db.settings import DBDetails as DB
 except:
     # This bare except statement is legit.
-    # If no settings file is supplied, connect to the database eos_db without
+    # If no settings file is supplied, we connect to the database eos_db without
     # a username or password - ie. rely on PostgreSQL ident auth.
+    pass
+
+EXTRA_STATES = None
+try:
+    from eos_db.settings import MachineStates as EXTRA_STATES
+except:
     pass
 
 from sqlalchemy import create_engine
@@ -77,17 +83,49 @@ def deploy_tables():
     """
     Base.metadata.create_all(engine)
 
-def setup_states(state_list):
+def get_state_list():
+    """The state list is a union of the internal states we need to function
+       plus anything else in EXTRA_STATES
+    """
+    state_list = (
+            'Started',
+            'Stopped',
+            'Restarting',
+            'Starting',
+            'Starting_Boosted',
+            'Stopping',
+            'Preparing',
+            'Prepared',
+            'Pre_Deboosting',
+            'Pre_Deboosted',
+            'Deboosted',
+            )
+
+    if EXTRA_STATES:
+        return state_list + tuple(EXTRA_STATES.state_list)
+    else:
+        return state_list
+
+
+def setup_states():
     """ Write the list of valid states to the database. """
-    # FIXME: Make sure states must be distinct
-    # FIXME2: Can't we do this automagically???
-    for state in state_list:
-        create_artifact_state(state)
+    # Make sure states must be distinct
+    sdict = {}
+    for state in get_state_list:
+        if state not in sdict:
+            create_artifact_state(state)
+            sdict[state] = 1
 
 def create_user(type, handle, name, username):
     """Create a new user record. """
     Base.metadata.create_all(engine)
-    return _create_thingy(User(name=name, username=username, uuid=handle, handle=handle))
+    user_id = _create_thingy(User(name=name, username=username, uuid=handle, handle=handle))
+
+    #Add this user to a group
+    if type:
+        create_group_membership(_create_touch(user_id, None, None), type)
+
+    return user_id
 
 def touch_to_add_user_group(username, group):
     """ Adds a touch to the database, then links it to a new user group
