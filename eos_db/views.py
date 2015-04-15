@@ -14,7 +14,7 @@ from pyramid.security import Allow, Everyone
 
 from eos_db import server
 
-class PermissionMap():
+class PermissionsMap():
     """This is passed to pyramid.config.Configurator in __init__.py,
        and defines the permissions attributed to each group. """
 
