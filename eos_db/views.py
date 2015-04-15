@@ -10,6 +10,8 @@ import hashlib, base64, random
 from pyramid.response import Response
 from pyramid.view import view_config
 from pyramid.httpexceptions import HTTPBadRequest, HTTPNotImplemented, HTTPUnauthorized, HTTPForbidden, HTTPNotFound
+from pyramid.security import Allow, Everyone
+
 from eos_db import server
 
 class PermissionMap():

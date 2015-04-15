@@ -22,8 +22,9 @@ Database and API server for Cloudhands-EOS system.
 
  ```sh
  $ ~/eoscloud-venv/bin/python setup.py develop
+ $ ~/eoscloud-venv/bin/python 
  $ ~/eoscloud-venv/bin/python bin/eos-init
- 
+
  $ ~/eoscloud-venv/bin/python bin/eos-admin help
  ```
 
@@ -38,5 +39,5 @@ Use this tool to configure your users and servers, before starting the DB:
 This assumes you want to develop the system.  For production, follow a
 similar path but do it in a dedicated account and use '... setup.py install'.
 
-The server module requires a Python 3 environment, but this is only due to the interface with the bcrypt
-module and may be resolved shortly.
+The server module requires a Python 3 environment, and will fail if used with Python2.
+( TODO - see what tests actuall fail )

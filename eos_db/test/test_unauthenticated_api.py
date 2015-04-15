@@ -1,5 +1,6 @@
 """Tests for what eos_db says when user does not authenticate.
 
+   $ ~/eoscloud-venv/bin/python3 -m unittest eos_db.test.test_unauthenticated_api
 """
 
 import unittest

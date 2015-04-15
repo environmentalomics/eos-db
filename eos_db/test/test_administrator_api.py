@@ -1,6 +1,6 @@
 """Tests for DB API behaviour when logged in as administrator
 
-   $ ~/eoscloud-venv/bin/python3 -m unittest eos_db.test.test_unauthenticated_api
+   $ ~/eoscloud-venv/bin/python3 -m unittest eos_db.test.test_administrator_api
 """
 import os
 import unittest, json
@@ -23,7 +23,7 @@ STATES_TO_TEST = [
 # Depend on test.ini in the same dir as thsi file.
 test_ini = os.path.join(os.path.dirname(__file__), 'test.ini')
 
-class TestVMAPI(unittest.TestCase):
+class TestAdminAPI(unittest.TestCase):
     """Tests API functions associated with VM actions.
        Note that all tests are in-process, we don't actually start a http server.
     """

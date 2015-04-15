@@ -20,7 +20,6 @@ from sqlalchemy import Column, Integer, String, DateTime, CHAR, ForeignKey
 from sqlalchemy import UniqueConstraint, CheckConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
-from pyramid.security import Allow, Everyone
 from bcrypt import hashpw, gensalt
 
 """The standard base object for declaratively instantiated data models.

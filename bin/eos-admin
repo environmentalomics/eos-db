@@ -109,6 +109,7 @@ if arg[0] == 'adduser':
         sys.exit("Failed. Ensure you enter a username and password.")
 
     try:
+        #All users are created as type "user"
         id = server.create_user("user", username, realname, username)
         print ("New user created with id %s" % id)
         server.touch_to_add_password(id, password)
