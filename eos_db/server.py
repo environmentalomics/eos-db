@@ -492,8 +492,14 @@ def touch_to_add_password(actor_id, password):
     :param password: The unencrypted password.
     """
     touch_id = _create_touch(actor_id, None, None)
-    password_id = create_password(touch_id, password)
+    password_id = _create_thingy(Password(touch_id=touch_id, password=password))
+
     return password_id
+
+def set_password(username, password):
+    """Sets the password for a user by name.  Just a convenience method.
+    """
+    touch_to_add_password(get_user_id_from_name(username), password)
 
 def touch_to_add_credit(actor_id, credit):
     """Creates a touch and an associated credit resource.
@@ -602,10 +608,6 @@ def _create_touch(actor_id, artifact_id, state_id):
                       state_id=state_id,
                       touch_dt=datetime.now())
     return _create_thingy(new_touch)
-
-def create_password(touch_id, password):
-    """ Create a Password, which knows how to BCrypt itself. """
-    return _create_thingy(Password(touch_id=touch_id, password=password))
 
 def create_ownership(touch_id, user_id):
     """ Add an ownership to a user. This requires a touch to have been created

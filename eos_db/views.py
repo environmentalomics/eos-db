@@ -81,6 +81,7 @@ def options(request):
     # FIXME: This is important for enabling CORS, although under certain
     # circumstances the browser doesn' appear to need it. Might be worth
     # examining why.
+    # FIXME2 - I don't think this is even used.  See the options callback instead.
     return None
 
 @view_config(request_method="POST", route_name='setup', renderer='json', permission="use")

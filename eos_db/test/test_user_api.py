@@ -4,46 +4,50 @@
 import os
 import unittest
 from webtest import TestApp
-# FIXME - do not rely on pyramid.paster for this
 from pyramid.paster import get_app
 
 # Depend on test.ini in the same dir as thsi file.
 test_ini = os.path.join(os.path.dirname(__file__), 'test.ini')
 
-class TestVMAPI(unittest.TestCase):
-    """Tests API functions associated with VM actions.
-       Note that all tests are in-process, we don't actually start a http server.
+class TestUserAPI(unittest.TestCase):
+    """Tests API functions associated with actions a regular user can take.
+       Note that all tests are in-process, we don't actually start a HTTP server.
+       All administrative requirements will be set up with direct calls
+       to eos_db.server, and all user calls will be done via self.app.
     """
     def setUp(self):
         """Launch pserve using webtest with test settings"""
         self.appconf = get_app(test_ini)
         self.app = TestApp(self.appconf)
-        self.app.authorization = ('Basic', ('administrator', 'asdf'))
 
-        response = self.app.post('/setup', )
-        response = self.app.post('/setup_states')
+        # This sets global var "engine" - in the case of SQLite this is a fresh RAM
+        # DB each time.  If we only did this on class instantiation the database would
+        # be dirty and one test could influence another.
+        # TODO - add a test that tests this.
+        server.choose_engine("SQLite")
 
+        # Punch in new user account with direct server call
+        # This will implicitly generate the tables.
+        server.create_user("users", "testuser", "test@user", "Fred Test")
+        server.set_password("testuser", "asdf")
 
-        #setup()             # Deploy tables
-        #setup_states()      # Populate states
-
-        # Authentication will use a specialised test account that we will poke
-        # into the database. We'll then instruct webtest to use it. It will act
-        # as an administrator for the purposes of authorisation.
-        # ---->poke in here
+        self.app.authorization = ('Basic', ('testuser', 'asdf'))
 
         # Note the response is checked for you.
         #
 
-    """Basic API support functions."""
+    """Unauthenticated API functions.
+
+       Should respond the same regardless of authentication.
+    """
 
     def test_home_view(self):
         """ Home view should respond with 200 OK. """
-        response = self.app.get('/', status=200, expect_errors=False)
+        response = self.app.get('/', status=200)
 
     def test_options(self):
         """ Options should respond with 200 OK. """
-        response = self.app.options('/', status=200, expect_errors=False)
+        response = self.app.options('/', status=200)
 
     """User API functions.
 
@@ -53,86 +57,78 @@ class TestVMAPI(unittest.TestCase):
     in later sections of the API. These can only be called by an
     administrator."""
 
-    def test_create_retrieve_user(self):
-        """ Creating a user should respond with 200 OK.
-        Retrieving the user should respond likewise. """
-        response = self.app.put('/users/testuser',
-                                {'type': 'values',
-                                'handle': 'testuser',
-                                'name': 'Test User',
-                                'username':'testuser'},
-                                status=200,
-                                expect_errors=False)
-        response = self.app.get('/users/testuser?actor_id=testuser',
-                                status=200,
-                                expect_errors=False)
+    def test_whoami(self):
+        """ How do I find out who I am? """
+        assertEqual('chalk', 'cheese')
+
+    def test_retrieve_my_info(self):
+        """ Retrieving my own user info should respond 200 OK. """
+
+        response = self.app.get('/users/testuser', status=200)
+
+        # Test that the JSON comes back as expected.
+        self.assertEqual(response.json, {'fix':'me'})
+
+    def test_retrieve_other_user_info(self):
+        """ Retrieving info for another user should respond 200 OK. """
+
+        self.create_user("anotheruser")
+
+        self.assertEqual(self.app.get('/users/anotheruser').json['name'], "anotheruser")
 
     def test_retrieve_users(self):
-        """ Add another user. Two records should be returned. """
-        response = self.app.put('/users/testuser',
-                                {'type': 'user',
-                                'handle': 'testuser',
-                                'name': 'Test User',
-                                'username':'testuser'},
-                                 status=200,
-                                 expect_errors=False)
-        response = self.app.put('/users/testuser2',
-                                {'type': 'user',
-                                'handle': 'testuser2',
-                                'name': 'Test User 2',
-                                'username':'testuser2'},
-                                status=200,
-                                expect_errors=False)
-        response = self.app.get('/users/', status=200, expect_errors=False)
+        """ Add another couple of users. Three records should be returned, as
+            there is already a testuser. """
 
-    def test_update_user(self):
-        """ Updating a user. Retrieve details. The results should reflect the
-        change. """
-        response = self.app.put('/users/testuser',
-                                {'type': 'user',
-                                'handle': 'testuser',
-                                'name': 'Test User',
-                                'username':'testuser'},
-                                status=200,
-                                expect_errors=False)
-        response = self.app.patch('/users/testuser',
-                                  {'type': 'user',
-                                  'handle': 'testuser',
-                                  'name': 'Test User Updated',
-                                  'username':'testuser'},
-                                  status=200,
-                                  expect_errors=False)
-        response = self.app.get('/users/testuser?actor_id=testuser',
-                                status=200,
-                                expect_errors=False)
+        self.create_user("foo")
+        self.create_user("bar")
+
+        response = self.app.get('/users/')
+
+        self.assertEqual(len(response.json), 3)
 
     def test_delete_user(self):
-        """ Delete a user. Attempt to retrieve details should return 404. """
-        response = self.app.put('/users/testuser',
-                                {'type': 'user',
-                                'handle': 'testuser',
-                                'name': 'Test User',
-                                'username':'testuser'},
-                                status=200,
-                                expect_errors=False)
-        response = self.app.delete('/users/testuser2',
-                                   status=200,
-                                   expect_errors=False)
+        """ Delete a user. Should fail because the account does not have permission.
+        """
+        self.create_user("anotheruser")
+        response = self.app.delete('/users/anotheruser', status=500)
 
 
-    def test_create_check_user_password(self):
+    def test_change_my_password(self):
         """ Apply a password to our user. Check that we receive a 200 OK.
-        Validate against the database with the user and password above.
-        We should receive an access token."""
-
+            Validate against the database with the user and password above.
+        """
+        #FIXME - this might be an expected fail.  Not sure if a user can set their own
+        #password yet or not.
         response = self.app.put('/users/testuser/password',
                                 {'actor_id': 'testuser',
-                                'password': 'testpass'},
-                                status=200,
-                                expect_errors=False)
-        response = self.app.get('/users/testuser/password?actor_id=testuser&password=testpass',
-                                status=200,
-                                expect_errors=False)
+                                'password': 'newpass'})
+
+        #This should fail as the password isnow wrong.
+        self.app.get('/users/testuser', status=501)
+
+        self.app.authorization = ('Basic', ('testuser', 'newpass'))
+
+        #This should work
+        response = self.app.get('/users/testuser')
+
+    def test_change_other_password(self):
+        """ Try to change password for another user, which should fail.
+        """
+        self.create_user("anotheruser")
+
+        response = self.app.put('/users/anotheruser/password',
+                                {'actor_id': 'testuser',
+                                 'password': 'newpass'},
+                                status=500)
+
+        #This should fail as the password isnow wrong.
+        self.app.get('/users/testuser', status=501)
+
+        self.app.authorization = ('Basic', ('testuser', 'newpass'))
+
+        #This should work
+        response = self.app.get('/users/testuser')
 
     def test_retrieve_user_touches(self):
         """ Retrieve a list of touches that the user has made to the database.
@@ -241,6 +237,22 @@ class TestVMAPI(unittest.TestCase):
 
     def test_retrieve_server_touches(self):
         """ Not currently implemented. """
+
+###############################################################################
+#                                                                             #
+# Support Functions, calling the server code directly                         #
+#                                                                             #
+###############################################################################
+
+    def create_user(self, name):
+        #Since we are not logged in as the administrator, do this directly
+        server.create_user("users", name, name + "@example.com", name + " " + name)
+
+    # FIXME - servers should not have uuid set to name, but maybe for testing it doesn't
+    # matter.
+    def create_server(self, name):
+        server.create_appliance(request.matchdict['name'], request.matchdict['name'])
+
 
 if __name__ == '__main__':
     unittest.main()

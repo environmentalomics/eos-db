@@ -8,6 +8,7 @@ from eos_db import server
 from webtest import TestApp
 from pyramid.paster import get_app
 
+# Hmmmmm
 STATES_TO_TEST = [
             'Starting',
             'Stopping',
@@ -20,12 +21,14 @@ STATES_TO_TEST = [
             'Prepared',
             'Boosting']
 
-# Depend on test.ini in the same dir as thsi file.
+# Depend on test.ini in the same dir as this file.
 test_ini = os.path.join(os.path.dirname(__file__), 'test.ini')
 
 class TestAdminAPI(unittest.TestCase):
     """Tests API functions associated with VM actions.
-       Note that all tests are in-process, we don't actually start a http server.
+       Note that all tests are in-process, we don't actually start a HTTP server,
+       but we do communicate HTTP requests and responses.
+       Outside of setUp, all calls to the database should be via the HTTP API.
     """
     def setUp(self):
         """Launch pserve using webtest with test settings"""
@@ -33,102 +36,130 @@ class TestAdminAPI(unittest.TestCase):
         self.app = TestApp(self.appconf)
 
 
-        server.choose_engine("SQLite")  # Sets global var "engine" - in the
-                                        # case of SQLite this is a fresh RAM
-                                        # DB each time.
-
-        # Switch to API basic auth with created account
-
+        # This sets global var "engine" - in the case of SQLite this is a fresh RAM
+        # DB each time.  If we only did this on class instantiation the database would
+        # be dirty and one test could influence another.
+        # TODO - add a test that tests this.
+        server.choose_engine("SQLite")
 
         # Punch in new administrator account with direct server call
         # This will implicitly generate the tables.
-        server.create_user("user", "administrator", "administrator", "administrator")
-        server.touch_to_add_user_group("administrator", "administrators")
-        server.touch_to_add_password(1, "adminpass")
+        server.create_user("administrators", "administrator", "administrator", "administrator")
+        #server.touch_to_add_user_group("administrator", "administrators")
+        server.set_password("administrator", "adminpass")
 
-        response = self.app.post('/setup_states')
-        # Change to direct call.
+        self.app.authorization = ('Basic', ('administrator', 'asdf'))
 
-    """Basic API support functions."""
+        # Don't need this for all tests.
+        #self.app.post('/setup_states')
+
+    """Unauthenticated API functions."""
 
     def test_home_view(self):
-        """ Home view should respond with 200 OK. """
-        response = self.app.get('/', status=200, expect_errors=False)
+        """ Home view should respond with 200 OK, as anyone can call it. """
+        response = self.app.get('/', status=200)
 
-    """User API functions.
+    """Admin API functions.
 
-    The user functions in the API are primarily used by system utilities.
+    The admin functions in the API are primarily used by system utilities.
     Creating a user and password, and validating against the database in
     order to receive an access token, are prerequisites for using functions
     in later sections of the API. These can only be called by an
     administrator."""
 
-    def test_create_retrieve_user(self):
+    def test_create_user(self):
         """ Creating a user should respond with 200 OK.
         Retrieving the user should respond likewise. """
-
-        self.create_user("testuser")
-
+        response = self.app.put('/users/testuser',
+                                {'type': 'users',
+                                'handle': 'testuser',
+                                'name': 'Test User',
+                                'username':'ignored'}, #Should be ignored
+                                status=200)
         response = self.app.get('/users/testuser',
-                                status=200,
-                                expect_errors=False)
+                                status=200)
+        response = self.app.get('/users/ignored',
+                                status=404)
 
-    def test_retrieve_users(self):
-        """ Add another user. Two records should be returned.
-
-        !! Not implemented. """
-
-        self.create_user("testuser")
-        self.create_user("testuser2")
-
-        response = self.app.get('/users', status=501, expect_errors=False)
 
     def test_update_user(self):
         """ Updating a user. Retrieve details. The results should reflect the
+        change. """
+        self.createuser('testuser')
+
+        self.app.patch(           '/users/testuser',
+                                  {'type': 'users',
+                                  'handle': 'testuser',
+                                  'name': 'Test User Updated',
+                                  'username':'testuser'})
+        response = self.app.get('/users/testuser?actor_id=testuser')
+
+        self.assertEqual(response.json['name'], 'Test User Updated')
+
+    def test_update_self(self):
+        """ Updating myself. Retrieve details. The results should reflect the
         change.
 
         !! Not implemented."""
 
-        self.create_user("testuser")
+        me = self.app.get('/whoami') # or whatever?  How was this implemented?
 
-        response = self.app.patch('/users/testuser',
-                                  {'type': 'user',
+        response = self.app.patch('/users/' + me,
+                                  {'type': 'users',
                                   'handle': 'testuser',
                                   'name': 'Test User Updated',
                                   'username':'testuser'},
-                                  status=501,
-                                  expect_errors=False)
+                                  status=501)
 
-        response = self.app.get('/users/testuser?actor_id=testuser',
-                                status=200,
-                                expect_errors=False)
+        response = self.app.get('/users/' + me)
+
+        self.assertEqual(response.json['name'], 'Test User Updated')
 
     def test_delete_user(self):
         """ Delete a user. Attempt to retrieve details should return 404.
 
         !! Not implemented."""
-        self.create_user("testuser")
-        response = self.app.delete('/users/testuser2',
-                                   status=501,
-                                   expect_errors=False)
+        self.createuser('testuser')
+        response = self.app.delete('/users/testuser')
 
+        response = self.app.get('/users/testuser', status=404)
 
-    def test_create_check_user_password(self):  # FIX
+    def test_change_my_password(self):
+        """ Apply a password to ourself. Check that we receive a 200 OK.
+            Check that i can now log in with the new password.
+            Note there is an equivalent test for a regular user setting their
+            own password.
+        """
+        self.createuser('testuser')
+        response = self.app.put('/users/administrator/password',
+                                {'password': 'newpass'})
+
+        #This should fail as the password is now wrong.
+        self.app.get('/users/testuser', status=501)
+
+        self.app.authorization = ('Basic', ('administrator', 'newpass'))
+
+        #This should now work
+        response = self.app.get('/users/testuser')
+
+    def test_set_user_password(self):  # FIX
         """ Apply a password to a user. Check that we receive a 200 OK.
-        Validate against the database with the user and password above.
-        We should receive an access token."""
+            Validate against the database with the user and password above.
+        """
 
-        self.create_user("testpassuser")
+        self.createuser('testpassuser')
 
-        response = self.app.put('/users/testpassuser/password',
-                                {'password': 'testpass'},
-                                status=200,
-                                expect_errors=False)
+        self.app.put(           '/users/testpassuser/password',
+                                {'password': 'testpass'})
+
+        #Should this actually work?  I think not! FIXME
+        # Maybe check the password by a direct call to the server??  Or setting
+        # basicauth credentials.
         response = self.app.get('/users/testpassuser/password?password=testpass',
                                 status=200,
                                 expect_errors=False)
 
-    def test_retrieve_user_touches(self):
+#     def test_retrieve_user_touches(self):
         """ Retrieve a list of touches that the user has made to the database.
         This can only be requested by the user themselves, an agent or an
         administrator.
@@ -151,7 +182,7 @@ class TestAdminAPI(unittest.TestCase):
                                 status=200,
                                 expect_errors=False)
 
-        assert json.loads(json.loads(response.text))['credit_balance'] == 1000  # ?? double encoded
+        assert response.json['credit_balance'] == 1000  # ?? double encoded
 
     def test_create_own_retrieve_servers(self):  # FIX
         """ Create a server. Ensure that a 200 OK response results.
@@ -168,23 +199,17 @@ class TestAdminAPI(unittest.TestCase):
 
         response = self.app.put('/servers/testserver/owner',
                                 {'artifact_id': 'testserver',
-                                'actor_id': 'bcollier'},
-                                status=200,
-                                expect_errors=False)
+                                'actor_id': 'bcollier'})
 
         # Get server
 
         response = self.app.get('/servers/testserver',
-                                {'hostname': 'testserver'},
-                                status=200,
-                                expect_errors=False)
+                                {'hostname': 'testserver'})
 
         # Get server ownership - !! Not implemented
 
         response = self.app.get('/servers/testserver/owner',
-                                {'artifact_id': 'testserver'},
-                                status=501,
-                                expect_errors=False)
+                                {'artifact_id': 'testserver'})
 
     """ Server State-Change Functions. """
 
@@ -196,21 +221,18 @@ class TestAdminAPI(unittest.TestCase):
         def push_to_state(state):
             response = self.app.post('/servers/testserver/' + state,
                             {'vm_id': 'testserver',
-                             'eos_token': 'TOKEN'},
-                            status=200,
-                            expect_errors=False)
+                             'eos_token': 'TOKEN'})
 
         def get_state():
             response = self.app.get('/servers/testserver/state',
-                            {'artifact_id': 'testserver'},
-                            status=200,
-                            expect_errors=False)
+                            {'artifact_id': 'testserver'})
             return response.text
 
         # Create server
 
         self.create_server("testserver")
 
+        #This should fail because not all the states are valid.
         for state in STATES_TO_TEST:
             push_to_state(state)
             current_state = get_state()
@@ -225,9 +247,7 @@ class TestAdminAPI(unittest.TestCase):
         # Retrieve server details
 
         response = self.app.get('/servers/testserver',
-                                {'hostname': 'testserver'},
-                                status=200,
-                                expect_errors=False)
+                                {'hostname': 'testserver'})
 
     def test_retrieve_server_by_id(self):
         """ Our server will have ID 1. Check that we can retrieve details of
@@ -237,21 +257,20 @@ class TestAdminAPI(unittest.TestCase):
 
         # Retrieve server details by name
 
-        response = self.app.get('/servers/by_id/1',
-                                status=200,
-                                expect_errors=False)
+        response = self.app.get('/servers/by_id/1')
 
-    def test_update_server(self):
-        """ Not currently implemented. """
-
-        self.create_server("testserver")  # Create server
+#     def test_update_server(self):
+#         """ Not currently implemented. """
+#
+#         self.create_server("testserver")  # Create server
 
         # Update server details
 
         # Check server details
 
-    def test_delete_server(self):
-        """ Not currently implemented. """
+#     def test_delete_server(self):
+#         """ Not currently implemented. """
+
 
     def test_set_get_server_specification(self):
         """ Follows hard-coded rules for machine behaviour.
@@ -300,8 +319,8 @@ class TestAdminAPI(unittest.TestCase):
 
     def create_user(self, name):
         response = self.app.put('/users/' + name,
-                                {'type': name,
-                                'handle': name,
+                                {'type': 'users',
+                                'handle': name + '@example.com',
                                 'name': name,
                                 'username': name},
                                 status=200,
@@ -313,6 +332,7 @@ class TestAdminAPI(unittest.TestCase):
                                  'uuid': name },
                                 status=200,
                                 expect_errors=False)
+
 
 if __name__ == '__main__':
     unittest.main()
