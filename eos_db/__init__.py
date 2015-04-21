@@ -8,11 +8,14 @@ from pyramid.security import authenticated_userid, remember
 
 import logging
 import os
+import warnings
 import eos_db.server
 
 from eos_db.hybridauth import HybridAuthenticationPolicy
 from pyramid.httpexceptions import HTTPUnauthorized
 
+# FIXME - when deployed we'll need to call from eoscloud.nerc.ac.uk, but that should be covered
+# as being the same origin.  In any case, this shouldn't be hard-coded I'm sure.
 ALLOWED_ORIGIN = ('http://localhost:6542',)
 
 def add_cors_headers_response_callback(event): # FIXME - Invalid name (PEP8)
@@ -42,20 +45,24 @@ def add_cookie_callback(event):
     """ Add a cookie containing a security token to all response headers from
     eos_db."""
 
+    #Suppress this warning which I already know about.  Note this sets the global
+    #warnings filter so it's something of a nasty side-effect.
+    warnings.filterwarnings("ignore", r'Behavior of MultiDict\.update\(\) has changed')
     def cookie_callback(request, response):
         """ Cookie callback. """
 
         if response.status[0] == '2':
-            print (remember(request, request.authenticated_userid))
+            print(remember(request, request.authenticated_userid))
             response.headers.update(remember(request,
                                              request.authenticated_userid))
+            print(response.headers)
 
     event.request.add_response_callback(cookie_callback)
 
 def groupfinder(userid, request):
-    """ Return the user group associated with the userid. This uses a server
-    function to check which group a user has been associated with. The valid
-    groups are stored in views.PermissionsMap """
+    """ Return the user group (just one) associated with the userid. This uses a server
+    function to check which group a user has been associated with. The mapping
+    of groups to capabilities is stored in views.PermissionsMap """
 
     # FIXME - server not called correctly. Is this even being called?
     # Also groupfinder doesn't use the request argument any more. Can be
@@ -137,13 +144,14 @@ def main(global_config, **settings):
 
     config.add_route('home', '/')
 
-    # Test setup calls
-
-    config.add_route('setup', '/setup')
+    # FIXME - database setup should be done when the server starts, not as
+    # an API call.
+    # FIXME2 - remove both these and all calls from the test code
+    config.add_route('setup',        '/setup')
     config.add_route('setup_states', '/setup_states')
 
     # Session API calls
-
+    # FIXME - no longer used because sessions are managed by auth.py
     config.add_route('sessions', '/sessions')   # Get session list
     config.add_route('session', '/session')     # Get session details or
                                                 # Post new session or
@@ -151,26 +159,30 @@ def main(global_config, **settings):
 
     # User-related API calls
 
-    config.add_route('users', '/users') # Return user list
-    config.add_route('user', '/user')   # Get user details or
-                                        # Put new user or
-                                        # Delete user
+    config.add_route('users', '/users')        # Return user list
+    config.add_route('user',  '/users/{name}')   # Get user details or
+                                                 # Put new user or
+                                                 # Delete user
+    #TODO - I think we need this?  How do i find out who I am?  By querying /session?
+    config.add_route('myself', '/user')
 
-    config.add_route('user_touches', '/users/{name}/touches')
+
+    config.add_route('user_touches',  '/users/{name}/touches')
                                             # Get server touches
 
     config.add_route('user_password', '/users/{name}/password')
                                             # Put new password
-                                            # Get password verification
+                                            # Get password verification by posting
+                                            # password=asdf ??  Or not?
 
-    config.add_route('user_credit', '/user/credit')
+    config.add_route('user_credit',   '/users/{name}/credit')
                                             # Put new credit or debit
                                             # Get current balance
 
     # Server-related API calls
 
     config.add_route('servers', '/servers')  # Return server list
-    config.add_route('server', '/servers/{name}')  # Get server details or
+    config.add_route('server',  '/servers/{name}')  # Get server details or
                                                     # Post new server or
                                                     # Delete server
 
@@ -178,22 +190,29 @@ def main(global_config, **settings):
 
     # Server state-related calls.
 
-    config.add_route('states', '/states')  # FIXME - Remove.
-    config.add_route('state', '/states/{name}') # Get list of servers in
-                                                # the given state.
+    config.add_route('states', '/states')       # FIXME - Remove.  Really?  Shouldn't this dump out the
+                                                # mapping of state->count that I need for my agent controller?
+    config.add_route('state',  '/states/{name}') # Get list of servers in
+                                                 # the given state.
 
-    config.add_route('server_start', '/servers/{name}/Starting')
-    config.add_route('server_stop', '/servers/{name}/Stopping')
-    config.add_route('server_restart', '/servers/{name}/Restarting')
-    config.add_route('server_pre_deboost', '/servers/{name}/Pre_Deboosting')
+    # FIXME
+    # What do these do?  And if we really need them, can we generate them
+    # by looping over server.get_state_list()?
+    # Looking at views.py, there is custom logic, so for example if you set
+    # a server Boosting it will set up a deboost and also change the credit.
+    # But I strongly suspect that Ben's logic is broken here.
+    config.add_route('server_start',         '/servers/{name}/Starting')
+    config.add_route('server_stop',          '/servers/{name}/Stopping')
+    config.add_route('server_restart',       '/servers/{name}/Restarting')
+    config.add_route('server_pre_deboost',   '/servers/{name}/Pre_Deboosting')
     config.add_route('server_pre_deboosted', '/servers/{name}/Pre_Deboosted')
-    config.add_route('server_started', '/servers/{name}/Started')
-    config.add_route('server_stopped', '/servers/{name}/Stopped')
-    config.add_route('server_prepare', '/servers/{name}/Preparing')
-    config.add_route('server_prepared', '/servers/{name}/Prepared')
-    config.add_route('server_boost', '/servers/{name}/Boosting')
-    config.add_route('server_boosted', '/servers/{name}/Boosted')
-    config.add_route('server_error', '/servers/{name}/Error')
+    config.add_route('server_started',       '/servers/{name}/Started')
+    config.add_route('server_stopped',       '/servers/{name}/Stopped')
+    config.add_route('server_prepare',       '/servers/{name}/Preparing')
+    config.add_route('server_prepared',      '/servers/{name}/Prepared')
+    config.add_route('server_boost',         '/servers/{name}/Boosting')
+    config.add_route('server_boosted',       '/servers/{name}/Boosted')
+    config.add_route('server_error',         '/servers/{name}/Error')
 
     config.add_route('server_state',
                      '/servers/{name}/state') # Get or put server state
@@ -208,7 +227,7 @@ def main(global_config, **settings):
 
     config.add_route('server_specification',
                      'servers/{name}/specification')    # Get or put server
-                                                        # specification
+                                                       # specification
 
     config.scan()
     return config.make_wsgi_app()

@@ -29,6 +29,9 @@ class TestUnAuth(unittest.TestCase):
         #No auth
         #app.authorization = ('Basic', ('user', 'password'))
 
+        #Do this because the authentication system needs to look at the user tables.
+        server.deploy_tables()
+
     def test_nosetup(self):
         """Does the API refuse to set up the database?
         """
@@ -56,12 +59,23 @@ class TestUnAuth(unittest.TestCase):
 
         self.assertEqual(response.headers.get('WWW-Authenticate', 'empty'), 'Basic realm="eos_db"')
 
+    def test_get_user(self):
+        """If I ask for info on a user, I should get a refusal regardless of whether that
+           user exists.
+        """
+        app = self.testapp
+        self.create_user("foo")
+
+        response = app.get('/users/foo', status=401)
+        self.assertEqual(response.headers.get('WWW-Authenticate', 'empty'), 'Basic realm="eos_db"')
+
+        response = app.get('/users/bar', status=401)
+        self.assertEqual(response.headers.get('WWW-Authenticate', 'empty'), 'Basic realm="eos_db"')
+
     def test_servers_baduser(self):
         """If I ask for a list of servers, and give a wrong username+password, I
            should get back a 403
         """
-        #Do this or else the password lookup throws an error.
-        server.deploy_tables()
 
         app = self.testapp
         app.authorization = ('Basic', ('baduser', 'badpassword'))
@@ -72,9 +86,9 @@ class TestUnAuth(unittest.TestCase):
     def test_servers_badpass(self):
         """Likewise if I give a valid user name but no password
         """
-        server.create_user("user", "administrator", "administrator", "administrator")
-        server.touch_to_add_user_group("administrator", "administrators")
-        server.touch_to_add_password(1, "adminpass")
+        server.create_user("administrators", "administrator", "administrator", "administrator")
+        #server.touch_to_add_user_group("administrator", "administrators")
+        server.set_password("administrator", "adminpass")
 
         app = self.testapp
         app.authorization = ('Basic', ('administrator', 'badpassword'))
@@ -86,11 +100,20 @@ class TestUnAuth(unittest.TestCase):
     def test_homepage_post(self):
         """Post to home page returns a 404 not found, as no endpoint is
            defined for a POST to this URL.
-           #FIXME - should really return a 405
+           #FIXME - should really return a 405??
         """
         app = TestApp(self.myapp)
 
         response = app.post('/', status=404, expect_errors=True)
+
+###############################################################################
+# Support Functions, calling the server code directly                         #
+###############################################################################
+
+    def create_user(self, name):
+        #Since we are not logged in as the administrator, do this directly
+        server.create_user("users", name, name + "@example.com", name + " " + name)
+
 
 
 if __name__ == '__main__':
