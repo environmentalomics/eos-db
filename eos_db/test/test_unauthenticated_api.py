@@ -9,6 +9,7 @@ from webtest import TestApp
 # Note that pyramid.paster does work in Py3, since PasteDeploy
 # is ported, though most of Paste is not.
 from pyramid.paster import get_app
+from http.cookiejar import DefaultCookiePolicy
 
 from eos_db import server
 
@@ -26,8 +27,9 @@ class TestUnAuth(unittest.TestCase):
         self.myapp = get_app(test_ini)
         self.testapp = TestApp(self.myapp)
 
-        #No auth
+        #No auth, no cookies
         #app.authorization = ('Basic', ('user', 'password'))
+        self.testapp.cookiejar.set_policy(DefaultCookiePolicy(allowed_domains=[]))
 
         #Do this because the authentication system needs to look at the user tables.
         server.deploy_tables()
@@ -56,11 +58,10 @@ class TestUnAuth(unittest.TestCase):
         app = self.testapp
 
         response = app.get('/servers', status=401)
-
         self.assertEqual(response.headers.get('WWW-Authenticate', 'empty'), 'Basic realm="eos_db"')
 
     def test_get_user(self):
-        """If I ask for info on a user, I should get a refusal regardless of whether that
+        """If I ask for info on a user, I should get a login challenge regardless of whether that
            user exists.
         """
         app = self.testapp
@@ -86,9 +87,9 @@ class TestUnAuth(unittest.TestCase):
     def test_servers_badpass(self):
         """Likewise if I give a valid user name but no password
         """
-        server.create_user("administrators", "administrator", "administrator", "administrator")
+        user_id = server.create_user("administrators", "administrator", "administrator", "administrator")
         #server.touch_to_add_user_group("administrator", "administrators")
-        server.set_password("administrator", "adminpass")
+        server.touch_to_add_password(user_id, "adminpass")
 
         app = self.testapp
         app.authorization = ('Basic', ('administrator', 'badpassword'))
@@ -112,7 +113,7 @@ class TestUnAuth(unittest.TestCase):
 
     def create_user(self, name):
         #Since we are not logged in as the administrator, do this directly
-        server.create_user("users", name, name + "@example.com", name + " " + name)
+        return server.create_user("users", name + "@example.com", name + " " + name, name)
 
 
 

@@ -13,6 +13,7 @@ from eos_db.models import State, ArtifactState, Deboost, SessionKey
 from eos_db.models import Resource, Node, Password, Credit, Specification
 from eos_db.models import Base
 
+# Load config.
 DB = None
 try:
     from eos_db.settings import DBDetails as DB
@@ -27,6 +28,28 @@ try:
     from eos_db.settings import MachineStates as EXTRA_STATES
 except:
     pass
+
+# FIXME - use this thing!!
+def with_session(f):
+    """Decorator that automatically passes a session to a function and then shuts
+       the session down at the end, unless a session was already passed in.
+    """
+    def inner(*args, **kwargs):
+        session = None
+        if not session in kwargs:
+            Session = sessionmaker(bind=engine, expire_on_commit=True)
+            session = Session()
+            kwargs['session'] = session
+        res = None
+        try:
+            res = f(*args, **kwargs)
+        except Exception as e:
+            if session: session.close()
+            raise e
+        if session: session.commit()
+        return res
+    return inner
+
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -102,22 +125,19 @@ def get_state_list():
             )
 
     if EXTRA_STATES:
-        return state_list + tuple(EXTRA_STATES.state_list)
+        return state_list + tuple(s for s in EXTRA_STATES.state_list if s not in state_list )
     else:
         return state_list
 
 
 def setup_states():
-    """ Write the list of valid states to the database. """
-    # Make sure states must be distinct
-    sdict = {}
-    for state in get_state_list:
-        if state not in sdict:
+    """ Write the list of valid states to the database.
+        The states need to be unique."""
+    for state in get_state_list():
             create_artifact_state(state)
-            sdict[state] = 1
 
 def create_user(type, handle, name, username):
-    """Create a new user record. """
+    """Create a new user record. Handle/uuid must be unique e-mail address"""
     Base.metadata.create_all(engine)
     user_id = _create_thingy(User(name=name, username=username, uuid=handle, handle=handle))
 
@@ -131,6 +151,7 @@ def touch_to_add_user_group(username, group):
     """ Adds a touch to the database, then links it to a new user group
         record.
     """
+    # FIXME?  Should this use the user_id, for consistency?  Not yet sure.
     user_id = get_user_id_from_name(username)
     touch_id = _create_touch(user_id, None, None)
     create_group_membership(touch_id, group)
@@ -138,10 +159,10 @@ def touch_to_add_user_group(username, group):
 
 def create_group_membership(touch_id, group):
     """ Create a new group membership resource. """
-    # FIXME - touch_id was unused, so clearly this was broken.  Needs testing!!!
     # FIXME2 - this is only ever used by the function above so fold the code in.
     Base.metadata.create_all(engine)
     return _create_thingy(GroupMembership(group=group))
+    # FIXME (Tim) - touch_id was unused, so clearly this was broken.  Test as-is first.
     #return _create_thingy(GroupMembership(group=group, touch_id=touch_id))
 
 def get_user_group(username):
@@ -312,16 +333,21 @@ def get_server_id_from_name(name):
 def get_user_id_from_name(name):
     """ Get the system ID of a user from his name.
 
-    :param name: The name of a user.
+    :param name: The username of a user.
     :returns: Internal ID of user.
     """
     # FIXME - Behaviour with duplicates also applies here. Ensure constraints
     # properly set.
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    print (name)
-    user_id = session.query(User.id).filter(User.handle == name).first()[0]
+    user_id = None
+    try:
+        user_id = session.query(User.id).filter(User.username == name).first()[0]
+    except:
+        pass #Convert this to a KeyError in just a sec...
     session.close()
+    if user_id is None:
+        raise KeyError("No such user")
     return user_id
 
 def _get_server_boost_status(artifact_id):
@@ -339,7 +365,7 @@ def _get_server_boost_status(artifact_id):
         cores, ram = get_latest_specification(artifact_id)
     except:
         cores, ram = 0, 0
-    session.close()
+    # FIXME - remove hard-coding of 40
     if ram >= 40:
         return "Boosted"
     else:
@@ -409,19 +435,11 @@ def get_server_uuid_by_id(id):
     session.close()
     return server
 
-def check_token(token, artifact_id):
-    # FIXME - This was built for the old auth philosophy and has to be altered.
-    # It's called only once in views.py
-    """Check if artifact belongs to owner of token"""
-    # token_actor_id = get_token_owner(token)
-    # return check_ownership(artifact_id, token_actor_id)
-    return True
-
 def check_ownership(artifact_id, actor_id):
     """ Check if an artifact belongs to a given user.
 
     :param artifact_id: A valid artifact id.
-    :param actor_id: A valid actor id.
+    :param actor_id: A valid actor (user) id.
     :returns: boolean to indicate ownership.
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
@@ -429,8 +447,7 @@ def check_ownership(artifact_id, actor_id):
     our_ownership = (session
                      .query(Ownership)
                      .filter(Ownership.touch_id == Touch.id)
-                     .filter(Touch.actor_id == Actor.id)
-                     .filter(Actor.handle == actor_id)
+                     .filter(Touch.actor_id == actor_id)
                      .order_by(Touch.id.desc())
                      .first())
     session.close()
@@ -455,11 +472,12 @@ def get_state_id_by_name(name):
     session.close()
     return state_id
 
-def touch_to_state(artifact_id, state_name):
+def touch_to_state(actor_id, artifact_id, state_name):
     """Creates a touch to move the VM into a given status.
     The state must be a valid state name as passed to setup_states
     - eg. Started, Restarting.
 
+    :param actor_id: User who is initiating the touch.  Can be None.
     :param artifact_id: ID of the VM we want to state-shift.
     :param state_name: Target state name, which will be mapped to an ID for us.
     :returns: touch ID
@@ -467,7 +485,7 @@ def touch_to_state(artifact_id, state_name):
     # Supplying an invalid state will trigger an exception here.
     # Ensure the states were properly loaded in the DB.
     state_id = get_state_id_by_name(state_name)
-    touch_id = _create_touch(None, artifact_id, state_id)
+    touch_id = _create_touch(actor_id, artifact_id, state_id)
     return touch_id
 
 def touch_to_add_deboost(vm_id, hours):
@@ -495,11 +513,6 @@ def touch_to_add_password(actor_id, password):
     password_id = _create_thingy(Password(touch_id=touch_id, password=password))
 
     return password_id
-
-def set_password(username, password):
-    """Sets the password for a user by name.  Just a convenience method.
-    """
-    touch_to_add_password(get_user_id_from_name(username), password)
 
 def touch_to_add_credit(actor_id, credit):
     """Creates a touch and an associated credit resource.
@@ -635,7 +648,7 @@ def check_password(username, password):
         print ("No password for user")
         return False
     else:
-        print ("Checking password" + password)
+        print ("Checking password " + password)
         return our_password.check(password)
 
 def _create_credit(touch_id, credit):
@@ -680,28 +693,27 @@ def check_actor_id(actor_id):
     """Checks to ensure an actor exists.
 
     :param actor_id: The actor id which we are checking.
-    :returns: True or False
+    :returns: True (1) or False (0)
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    if session.query(Actor).filter(Actor.handle == actor_id).count() > 0:
-        session.close()
-        return True
-    else:
-        session.close()
-        return False
+    res = session.query(Actor).filter(Actor.id == actor_id).count()
+    session.close()
+    return res
 
 def check_user_details(user_id):
     """Generates a list of account details for an actor.
 
-    :param actor_id: The actor id which we are checking.
+    :param user_id: The actor id which we are checking.
     :returns: Dictionary containing user details
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    our_user = session.query(User).filter_by(handle=user_id).first()
+    our_user = session.query(User).filter_by(id=user_id).first()
     session.close()
+    #TODO - add user group
     return {'id':our_user.id,
+            'handle':our_user.handle,
             'username': our_user.username,
             'name': our_user.name
             }
@@ -728,7 +740,7 @@ def _list_artifacts_for_user(user_id):
                .filter(Artifact.id == Touch.artifact_id)
                .filter(Touch.id == Ownership.touch_id)
                .filter(Ownership.user_id == Actor.id)
-               .filter(Actor.handle == user_id)
+               .filter(Actor.id == user_id)
                .distinct(Artifact.id)
                .all())
     session.close()

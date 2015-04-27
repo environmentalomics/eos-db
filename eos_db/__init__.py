@@ -77,12 +77,15 @@ def passwordcheck():
     """Generates a callback supplied to HybridAuthenticationPolicy to check
        the password. The password check is cached to speed up checking when
        the same user is repeatedly accessing the system, or when the system
-       makes multiple password checks for a single request.
+       makes multiple internal password checks for a single request.
     """
 
     # Bcrypt is slow, which is good to deter dictionary attacks, but bad when
     # the same user is calling multiple API calls, and especially bad for the
-    # tests. This one-item cache should be crude but effective:
+    # tests. This one-item cache should be crude but effective.
+    # It does mean that if you chage a password the old one will still work until
+    # you or someone else logs in.  A workaround is to force a dummy login after
+    # a password change.
     lastpass = [""]
 
     def _passwordcheck(login, password, request):
@@ -91,6 +94,7 @@ def passwordcheck():
         print("Checking %s:%s for %s" % (login, password, request))
         print("Lastpass is " + lastpass[0])
 
+        #FIXME - surely 'group:agents'
         if login == "agent" and password == "sharedsecret":
             return ['group-agents']
 
@@ -150,21 +154,19 @@ def main(global_config, **settings):
     config.add_route('setup',        '/setup')
     config.add_route('setup_states', '/setup_states')
 
-    # Session API calls
-    # FIXME - no longer used because sessions are managed by auth.py
-    config.add_route('sessions', '/sessions')   # Get session list
-    config.add_route('session', '/session')     # Get session details or
-                                                # Post new session or
-                                                # Delete session
+    # User-related API calls (callable by users)
 
-    # User-related API calls
+    config.add_route('users',       '/users')         # Return user list
 
-    config.add_route('users', '/users')        # Return user list
+    config.add_route('my_user',     '/user')          # Return info about me
+    config.add_route('my_password', '/user/password') # Set my password
+    config.add_route('my_touches',  '/user/touches')  # Get server touches
+    config.add_route('my_credit',   '/user/credit')   # Get (but not set!) my credit
+
+    # User-related API calls (callable by Actors/Admins)
     config.add_route('user',  '/users/{name}')   # Get user details or
                                                  # Put new user or
                                                  # Delete user
-    #TODO - I think we need this?  How do i find out who I am?  By querying /session?
-    config.add_route('myself', '/user')
 
 
     config.add_route('user_touches',  '/users/{name}/touches')

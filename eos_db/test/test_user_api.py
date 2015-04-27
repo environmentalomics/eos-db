@@ -3,8 +3,10 @@
 """
 import os
 import unittest
+from eos_db import server
 from webtest import TestApp
 from pyramid.paster import get_app
+from http.cookiejar import DefaultCookiePolicy
 
 # Depend on test.ini in the same dir as thsi file.
 test_ini = os.path.join(os.path.dirname(__file__), 'test.ini')
@@ -16,9 +18,11 @@ class TestUserAPI(unittest.TestCase):
        to eos_db.server, and all user calls will be done via self.app.
     """
     def setUp(self):
-        """Launch pserve using webtest with test settings"""
+        """Launch app using webtest with test settings"""
         self.appconf = get_app(test_ini)
         self.app = TestApp(self.appconf)
+        #All auth via BasicAuth - never return the session cookie.
+        self.app.cookiejar.set_policy(DefaultCookiePolicy(allowed_domains=[]))
 
         # This sets global var "engine" - in the case of SQLite this is a fresh RAM
         # DB each time.  If we only did this on class instantiation the database would
@@ -28,13 +32,15 @@ class TestUserAPI(unittest.TestCase):
 
         # Punch in new user account with direct server call
         # This will implicitly generate the tables.
-        server.create_user("users", "testuser", "test@user", "Fred Test")
-        server.set_password("testuser", "asdf")
+        user_id = self.create_user("testuser")
 
+        print("user_id is %s" % str(user_id))
+        print("user_from_db_is %s" % server.get_user_id_from_name("testuser"))
+
+        server.touch_to_add_password(user_id, "asdf")
+
+        # And log in as this user for all tests (via BasicAuth)
         self.app.authorization = ('Basic', ('testuser', 'asdf'))
-
-        # Note the response is checked for you.
-        #
 
     """Unauthenticated API functions.
 
@@ -59,23 +65,38 @@ class TestUserAPI(unittest.TestCase):
 
     def test_whoami(self):
         """ How do I find out who I am? """
-        assertEqual('chalk', 'cheese')
+        response = self.app.get('/user')
+
+        #We expect to be user 1, as the database is fresh.
+        #All other items should be as per create_user("testuser")
+        self.assertEqual( response.json,
+                          { "name":   "testuser testuser",
+                            "handle": "testuser@example.com",
+                            "id": 1,
+                            "username": "testuser"} )
 
     def test_retrieve_my_info(self):
-        """ Retrieving my own user info should respond 200 OK. """
+        """ Retrieving my own user info by name should give the same result
+            as above."""
 
         response = self.app.get('/users/testuser', status=200)
 
-        # Test that the JSON comes back as expected.
-        self.assertEqual(response.json, {'fix':'me'})
+        #We expect to be user 1, as the database is fresh.
+        #All other items should be as per create_user("testuser")
+        self.assertEqual( response.json,
+                          { "name":   "testuser testuser",
+                            "handle": "testuser@example.com",
+                            "id": 1,
+                            "username": "testuser"} )
 
     def test_retrieve_other_user_info(self):
         """ Retrieving info for another user should respond 200 OK. """
 
         self.create_user("anotheruser")
 
-        self.assertEqual(self.app.get('/users/anotheruser').json['name'], "anotheruser")
+        self.assertEqual(self.app.get('/users/anotheruser').json['name'], "anotheruser anotheruser")
 
+    @unittest.skip
     def test_retrieve_users(self):
         """ Add another couple of users. Three records should be returned, as
             there is already a testuser. """
@@ -87,6 +108,8 @@ class TestUserAPI(unittest.TestCase):
 
         self.assertEqual(len(response.json), 3)
 
+    #Unimplemented just now.
+    @unittest.skip
     def test_delete_user(self):
         """ Delete a user. Should fail because the account does not have permission.
         """
@@ -96,21 +119,19 @@ class TestUserAPI(unittest.TestCase):
 
     def test_change_my_password(self):
         """ Apply a password to our user. Check that we receive a 200 OK.
-            Validate against the database with the user and password above.
+            Check we can log in with the new password but not the old.
         """
-        #FIXME - this might be an expected fail.  Not sure if a user can set their own
-        #password yet or not.
-        response = self.app.put('/users/testuser/password',
-                                {'actor_id': 'testuser',
-                                'password': 'newpass'})
-
-        #This should fail as the password isnow wrong.
-        self.app.get('/users/testuser', status=501)
-
-        self.app.authorization = ('Basic', ('testuser', 'newpass'))
+        response = self.app.put('/user/password',
+                                {'password': 'newpass'})
 
         #This should work
-        response = self.app.get('/users/testuser')
+        self.app.authorization = ('Basic', ('testuser', 'newpass'))
+        self.app.get('/users/testuser')
+
+
+        #This should fail as the password is now wrong.
+        self.app.authorization = ('Basic', ('testuser', 'asdf'))
+        self.app.get('/users/testuser', status=401)
 
     def test_change_other_password(self):
         """ Try to change password for another user, which should fail.
@@ -118,17 +139,8 @@ class TestUserAPI(unittest.TestCase):
         self.create_user("anotheruser")
 
         response = self.app.put('/users/anotheruser/password',
-                                {'actor_id': 'testuser',
-                                 'password': 'newpass'},
-                                status=500)
-
-        #This should fail as the password isnow wrong.
-        self.app.get('/users/testuser', status=501)
-
-        self.app.authorization = ('Basic', ('testuser', 'newpass'))
-
-        #This should work
-        response = self.app.get('/users/testuser')
+                                {'password': 'newpass'},
+                                status=401)
 
     def test_retrieve_user_touches(self):
         """ Retrieve a list of touches that the user has made to the database.
@@ -239,19 +251,17 @@ class TestUserAPI(unittest.TestCase):
         """ Not currently implemented. """
 
 ###############################################################################
-#                                                                             #
 # Support Functions, calling the server code directly                         #
-#                                                                             #
 ###############################################################################
 
     def create_user(self, name):
         #Since we are not logged in as the administrator, do this directly
-        server.create_user("users", name, name + "@example.com", name + " " + name)
+        return server.create_user("users", name + "@example.com", name + " " + name, name)
 
     # FIXME - servers should not have uuid set to name, but maybe for testing it doesn't
     # matter.
     def create_server(self, name):
-        server.create_appliance(request.matchdict['name'], request.matchdict['name'])
+        return server.create_appliance(name, name)
 
 
 if __name__ == '__main__':
