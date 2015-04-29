@@ -21,6 +21,7 @@ class TestUserAPI(unittest.TestCase):
         """Launch app using webtest with test settings"""
         self.appconf = get_app(test_ini)
         self.app = TestApp(self.appconf)
+
         #All auth via BasicAuth - never return the session cookie.
         self.app.cookiejar.set_policy(DefaultCookiePolicy(allowed_domains=[]))
 
@@ -51,6 +52,7 @@ class TestUserAPI(unittest.TestCase):
         """ Home view should respond with 200 OK. """
         response = self.app.get('/', status=200)
 
+    # Not sure why Ben implemented options, but it should still work.
     def test_options(self):
         """ Options should respond with 200 OK. """
         response = self.app.options('/', status=200)

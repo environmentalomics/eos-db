@@ -3,25 +3,52 @@
     user can authenticate on any view with Basic Auth, but will then receive a
     cookie with an auth ticket, and be able to use that for subsequent
     requests.
+
+    Basically, with this scheme, every page becomes a login page.  The
+    advantage is that scripts can use BasicAuth which is super-siple,
+    but templates and JavaScript can use a Cookie which is faster and simpler
+    for them.
 """
 
 from pyramid.authentication import (BasicAuthAuthenticationPolicy,
                                     AuthTktAuthenticationPolicy)
 from pyramid.httpexceptions import HTTPUnauthorized
 
+from eos_db import server
+import bcrypt
+
+#Utility functions to interact with eos_db.server
+def groupfinder(userid, request):
+    """ Return the user group (just one) associated with the userid. This uses a server
+        function to check which group a user has been associated with. The mapping
+        of groups to actual capabilities is stored in views.PermissionsMap """
+
+    # FIXME - server not called correctly. Is this even being called?
+    # Also groupfinder doesn't use the request argument any more. Can be
+    # streamlined?
+
+    group = server.get_user_group(userid)
+    if group:
+        return ["group:" + str(group)]
+
+
 class HybridAuthenticationPolicy():
     """ HybridAuthenticationPolicy. Called in the same way as other auth
         policies, but wraps Basic and AuthTkt.
     """
 
-    def __init__(self, check, secret, callback, realm='Realm'):
+    def __init__(self, check, secret, callback=None, realm='Realm'):
         """ We need to initialise variables here for both forms of auth which
             we're planning on using.
         """
+        # This seemed sensible but now I think not:
+#         if not secret:
+#             secret = bcrypt.gensalt().decode()[7:]
+        if not callback:
+            callback = groupfinder
 
         self.check = check   # Password check routine passed to the constructor.
         self.realm = realm   # Basic Auth realm.
-        self.secret = secret # Secret used for construction of Auth Ticket.
 
         # Now initialise both Auth Policies. AuthTkt has sha256 specified in
         # place of the default MD5 in order to suppress warnings about
@@ -48,6 +75,11 @@ class HybridAuthenticationPolicy():
                 #print ("Basicauth UserID: " + userid)
                 return userid
 
+        #FIXME
+        #Or, surely:
+        return ( self.tap.unauthenticated_userid(request) or
+                 self.bap.unauthenticated_userid(request) )
+
     def authenticated_userid(self, request):
         """ Return the Auth Ticket user ID if that exists. If not, then check
             for a user ID in Basic Auth.
@@ -59,6 +91,9 @@ class HybridAuthenticationPolicy():
             userid = self.bap.authenticated_userid(request)
             #if userid: print ("Basicauth Authd UserID: " + userid)
         return userid
+
+        #FIXME
+        #Simplify as above.
 
     def effective_principals(self, request):
         """ Returns the list of effective principles from the auth policy

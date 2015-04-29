@@ -58,7 +58,7 @@ from datetime import datetime, timedelta
 
 engine = ""  # Assume no default database connection
 
-def choose_engine(enginestring):
+def choose_engine(enginestring, replace=True):
     """
     Create a connection to a database. If Postgres is selected, this will
     connect to the database specified in the settings.py file. If SQLite is
@@ -69,6 +69,9 @@ def choose_engine(enginestring):
     settings for sqlalchemy.engine instead.
     """
     global engine
+
+    if engine and not replace:
+        return
 
     if enginestring == "PostgreSQL":
         if DB and DB.username:
@@ -151,7 +154,7 @@ def touch_to_add_user_group(username, group):
     """ Adds a touch to the database, then links it to a new user group
         record.
     """
-    # FIXME?  Should this use the user_id, for consistency?  Not yet sure.
+    # FIXME?  Should this use the user_id, not username, for consistency?  Not yet sure.
     user_id = get_user_id_from_name(username)
     touch_id = _create_touch(user_id, None, None)
     create_group_membership(touch_id, group)
@@ -161,9 +164,9 @@ def create_group_membership(touch_id, group):
     """ Create a new group membership resource. """
     # FIXME2 - this is only ever used by the function above so fold the code in.
     Base.metadata.create_all(engine)
-    return _create_thingy(GroupMembership(group=group))
+    #return _create_thingy(GroupMembership(group=group))
     # FIXME (Tim) - touch_id was unused, so clearly this was broken.  Test as-is first.
-    #return _create_thingy(GroupMembership(group=group, touch_id=touch_id))
+    return _create_thingy(GroupMembership(group=group, touch_id=touch_id))
 
 def get_user_group(username):
     """ Get the group associated with a given username. """
@@ -173,11 +176,13 @@ def get_user_group(username):
         session = Session()
         group = (session
                  .query(GroupMembership.group)
+                 .filter(GroupMembership.touch_id == Touch.id)
                  .filter(Touch.actor_id == actor_id)
                  .order_by(Touch.touch_dt.desc())
                  .first())
         session.close()
-        return group
+        print("get_user_group: User %s is in group %s" % (username, group[0]))
+        return group[0]
     else:
         return None
 
@@ -325,7 +330,22 @@ def get_server_id_from_name(name):
     session = Session()
     artifact_id = (session
                    .query(Artifact.id)
-                   .filter(Artifact.uuid == name)
+                   .filter(Artifact.name == name)
+                   .first())[0]
+    session.close()
+    return artifact_id
+
+def get_server_id_from_uuid(uuid):
+    """ Get the system ID of a server from its name.
+
+    :param name: The name of an artifact.
+    :returns: Internal ID of artifact.
+    """
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+    session = Session()
+    artifact_id = (session
+                   .query(Artifact.id)
+                   .filter(Artifact.uuid == uuid)
                    .first())[0]
     session.close()
     return artifact_id
@@ -342,7 +362,10 @@ def get_user_id_from_name(name):
     session = Session()
     user_id = None
     try:
-        user_id = session.query(User.id).filter(User.username == name).first()[0]
+        user_id = (session
+                   .query(User.id)
+                   .filter(User.username == name)
+                   .first())[0]
     except:
         pass #Convert this to a KeyError in just a sec...
     session.close()

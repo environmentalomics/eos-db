@@ -1,5 +1,5 @@
-"""Tests for DB API behaviour when logged in as administrator
-
+"""Tests the HybridAuth mechanism for authentication.
+   See auth.py for an explanation of how this works.
 """
 import os
 import unittest, requests
@@ -26,58 +26,93 @@ class TestCookie(unittest.TestCase):
                                         # DB each time.
 
         # Create new user. This will implicitly generate the tables.
-
-        server.create_user("user", "testuser", "testuser", "testuser")
+        id1 = server.create_user(None, "testuser", "testuser", "testuser")
         server.touch_to_add_user_group("testuser", "users")
-        server.touch_to_add_password(1, "testpass")
+        server.touch_to_add_password(id1, "testpass")
 
-        server.create_user("user", "administrator", "administrator", "administrator")
+        id2 = server.create_user(None, "administrator", "administrator", "administrator")
         server.touch_to_add_user_group("administrator", "administrators")
-        server.touch_to_add_password(2, "adminpass")
+        server.touch_to_add_password(id2, "adminpass")
 
-    """Basic API support functions."""
+    """Confirm lack of any cookie without authentication."""
+    def test_no_cookie_without_auth(self):
+        """ No cookie should be set when calling an endpoint that
+            does not require authorization.
+        """
+        self.app.authorization = None
+        r = self.app.get("/", status=200)
+
+        self.assertEqual(r.headers.get('Set-Cookie', 'empty'), 'empty')
+
+        #Equivalently:
+        self.assertEqual(self.app.cookies, {})
 
     def test_no_username(self):
-        """ The DB API should return a 401 unauthorised if I submit a request 
-        with no username / password provided. """
+        """ The DB API should return a 401 unauthorised if I submit a request
+            with no username / password provided.
+            Similar to test_unauthenticated_api but with an extra check that no
+            cookie is set.
+        """
         self.app.authorization = None
-        r = self.app.get("/users/johndoe/password", status=401, expect_errors=False)
+        r = self.app.get("/users/testuser", status=401)
+
+        self.assertEqual(r.headers.get('Set-Cookie', 'empty'), 'empty')
+
 
     def test_invalid_username(self):
-        """ The DB API should return a 401 unauthorised if I submit a bad 
-        username / password combination. """
+        """ The DB API should return a 401 unauthorised if I submit a bad
+            username / password combination.  And again no cookie
+        """
         self.app.authorization = ('Basic', ('invaliduser', 'invalidpassword'))
-        r = self.app.get("/users/johndoe/password", status=401, expect_errors=False)
 
+        r = self.app.get("/users/testuser", status=401)
+        self.assertEqual(r.headers.get('Set-Cookie', 'empty'), 'empty')
+
+    """Confirm cookie returned upon authentication."""
     def test_valid_username(self):
         """ The DB API should return a cookie if I submit a correct username
         and password. The cookie should allow me to make a successful request
         using it alone. """
 
-        print ("Start test...")
         self.app.authorization = ('Basic', ('testuser', 'testpass'))
-        r = self.app.get("/users/testuser", status=200, expect_errors=False)
+        r = self.app.get("/users/testuser", status=200)
         cookie = self.app.cookies['auth_tkt']
-        print ("Cookie: " + cookie)
-        print ("Resetting session...")
-        self.app.reset()  # clear cookie cache
-        self.app.authorization = None  # remove auth credentials
+
+        self.app.reset()                         # clear cookie cache
+        self.app.authorization = None            # remove auth credentials
         self.app.set_cookie("auth_tkt", cookie)  # set cookie to old value
-        print ("Making request...")
-        r = self.app.get("/users/testuser", status=200, expect_errors=False)
+
+        r = self.app.get("/users/testuser", status=200)
+
+        #Furthermore, we should still get the same cookie on the second call
+        self.assertEqual(self.app.cookies['auth_tkt'], cookie)
 
     def test_broken_cookie(self):
         """ The DB API should refuse to service a request with a broken cookie. """
 
         print ("Start test...")
         self.app.authorization = ('Basic', ('testuser', 'testpass'))
-        r = self.app.get("/users/testuser", status=200, expect_errors=False)
-        cookie = 'ca32e31f7b9ed0157ed645911880309d7s809d1fb80dc207f41d2' + \
-        'a14a88e0d77e328f8e56410b0b195e4dd4824e7d1acb1dbe412b041ce7aae3' + \
-        '88f72b8ac747b551bc59adGVzdHVzZXI%3D!userid_type:b64unicode'
-        self.app.reset()  # clear cookie cache
-        self.app.authorization = None  # remove auth credentials
-        r = self.app.get("/users/testuser", headers={'auth_tkt': cookie}, status=401, expect_errors=False)
+        r = self.app.get("/users/testuser", status=200)
+        cookie = 'I am a fish'
+
+        self.app.reset()                         # clear cookie cache
+        self.app.authorization = None            # remove auth credentials
+        self.app.set_cookie("auth_tkt", cookie)  # set cookie to bad value
+        r = self.app.get("/users/testuser", status=401, expect_errors=False)
+
+    def test_invalid_cookie(self):
+        """ The DB API should refuse to service a request with an invalid cookie. """
+
+        print ("Start test...")
+        self.app.authorization = ('Basic', ('testuser', 'testpass'))
+        r = self.app.get("/users/testuser", status=200)
+        cookie = '94514a32a7923939584470e8fc01f9b073bc3c8171542c8b7deb0' + \
+                 'dd459400945553f9ed9dGVzdHVzZXI%3D!userid_type:b64unicode'
+
+        self.app.reset()                         # clear cookie cache
+        self.app.authorization = None            # remove auth credentials
+        self.app.set_cookie("auth_tkt", cookie)  # set cookie to bad value
+        r = self.app.get("/users/testuser", status=401, expect_errors=False)
 
 if __name__ == '__main__':
     unittest.main()

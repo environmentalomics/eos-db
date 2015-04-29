@@ -28,7 +28,7 @@ class TestUnAuth(unittest.TestCase):
         self.testapp = TestApp(self.myapp)
 
         #No auth, no cookies
-        #app.authorization = ('Basic', ('user', 'password'))
+        self.testapp.authorization = None
         self.testapp.cookiejar.set_policy(DefaultCookiePolicy(allowed_domains=[]))
 
         #Do this because the authentication system needs to look at the user tables.

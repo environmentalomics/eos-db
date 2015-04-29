@@ -27,7 +27,7 @@ _view_config = view_config
 def view_config(*args, **kwargs):
     def new_decorator(f):
         if f.__name__ in globals():
-            raise AttributeError("This module already has a function %s defined" % f.__name__)
+            raise AttributeError("This module already has a function %s() defined" % f.__name__)
         return _view_config(*args, **kwargs)(f)
     return new_decorator
 
@@ -84,20 +84,36 @@ def home_view(request):
 
 # OPTIONS call result
 
-@view_config(request_method="OPTIONS", route_name='servers', renderer='json')
-@view_config(request_method="OPTIONS", route_name='server_start', renderer='json')
-@view_config(request_method="OPTIONS", route_name='server_stop', renderer='json')
-@view_config(request_method="OPTIONS", route_name='server_restart', renderer='json')
-@view_config(request_method="OPTIONS", route_name='server_pre_deboost', renderer='json')
-@view_config(request_method="OPTIONS", route_name='server_prepare', renderer='json')
-@view_config(request_method="OPTIONS", route_name='server_specification', renderer='json')
+@view_config(request_method="OPTIONS", route_name='home')
+@view_config(request_method="OPTIONS", route_name='servers')
 def options(request):
     """ Return the OPTIONS header. """
     # FIXME: This is important for enabling CORS, although under certain
     # circumstances the browser doesn' appear to need it. Might be worth
     # examining why.
-    # FIXME2 - I don't think this is even used.  See the options callback instead.
-    return None
+    # FIXME2: I suspect this was never needed but might as well make it pass
+    # the tests for now.
+    resp = Response(None)
+    resp.headers['Allow'] = "HEAD,GET,OPTIONS"
+    return resp
+
+@view_config(request_method="OPTIONS", route_name='server_specification')
+def options2(request):
+    resp = Response(None)
+    resp.headers['Allow'] = "HEAD,GET,POST,OPTIONS"
+    return resp
+
+@view_config(request_method="OPTIONS", route_name='server_start')
+@view_config(request_method="OPTIONS", route_name='server_stop')
+@view_config(request_method="OPTIONS", route_name='server_restart')
+@view_config(request_method="OPTIONS", route_name='server_pre_deboost')
+@view_config(request_method="OPTIONS", route_name='server_prepare')
+def options3(request):
+    resp = Response(None)
+    resp.headers['Allow'] = "HEAD,POST,OPTIONS"
+    return resp
+
+# End of OPTIONS guff
 
 @view_config(request_method="POST", route_name='setup', renderer='json', permission="use")
 def setup(request):
@@ -213,7 +229,7 @@ def retrieve_user_touches(request):
     name = request.matchdict['name']
     return name
 
-@view_config(request_method="POST", route_name='user_credit', renderer='json', permission="administer")
+@view_config(request_method="POST", route_name='user_credit', renderer='json', permission="act")
 def create_user_credit(request):
     """Adds credit to a user account, negative or positive.
 
@@ -236,7 +252,7 @@ def create_user_credit(request):
     except KeyError:
         return HTTPNotFound()
 
-@view_config(request_method="GET", route_name='user_credit', renderer='json', permission="administer")
+@view_config(request_method="GET", route_name='user_credit', renderer='json', permission="act")
 def retrieve_user_credit(request):
     """Return credits outstanding for any user.
 
@@ -249,8 +265,8 @@ def retrieve_user_credit(request):
         credits = server.check_credit(user_id)
         return  {'actor_id': user_id,
                  'credit_balance': int(credits)}
-    except KeyError:
-        return HTTPNotFound()
+    except KeyError as e:
+        return HTTPNotFound(str(e))
 
 @view_config(request_method="GET", route_name='my_credit', renderer='json', permission="use")
 def retrieve_my_credit(request):

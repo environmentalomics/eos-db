@@ -9,16 +9,17 @@ from pyramid.security import authenticated_userid, remember
 import logging
 import os
 import warnings
-import eos_db.server
 
-from eos_db.hybridauth import HybridAuthenticationPolicy
+from eos_db import server
+from eos_db.auth import HybridAuthenticationPolicy
 from pyramid.httpexceptions import HTTPUnauthorized
 
 # FIXME - when deployed we'll need to call from eoscloud.nerc.ac.uk, but that should be covered
-# as being the same origin.  In any case, this shouldn't be hard-coded I'm sure.
+# as being the same origin.  In any case, this shouldn't be hard-coded I'm sure.  Maybe return
+# http://localhost:* works?
 ALLOWED_ORIGIN = ('http://localhost:6542',)
 
-def add_cors_headers_response_callback(event): # FIXME - Invalid name (PEP8)
+def add_cors_callback(event):
     """ Add response header to enable Cross-Origin Resource Sharing. The
     calling domain is checked against the tuple ALLOWED_ORIGIN, and if it
     matches, then a set of allow headers are sent, allowing the origin, the
@@ -59,25 +60,14 @@ def add_cookie_callback(event):
 
     event.request.add_response_callback(cookie_callback)
 
-def groupfinder(userid, request):
-    """ Return the user group (just one) associated with the userid. This uses a server
-    function to check which group a user has been associated with. The mapping
-    of groups to capabilities is stored in views.PermissionsMap """
 
-    # FIXME - server not called correctly. Is this even being called?
-    # Also groupfinder doesn't use the request argument any more. Can be
-    # streamlined.
-
-    group = server.get_user_group(userid)
-    if group is not None:
-        return ["group:" + str(group[0])]
-
-
-def passwordcheck():
+def passwordcheck(hardcoded=()):
     """Generates a callback supplied to HybridAuthenticationPolicy to check
        the password. The password check is cached to speed up checking when
        the same user is repeatedly accessing the system, or when the system
        makes multiple internal password checks for a single request.
+       Any (user,pass,group) triplets passed as hardcoded will be let through
+       without querying the database.
     """
 
     # Bcrypt is slow, which is good to deter dictionary attacks, but bad when
@@ -86,22 +76,34 @@ def passwordcheck():
     # It does mean that if you chage a password the old one will still work until
     # you or someone else logs in.  A workaround is to force a dummy login after
     # a password change.
+    # FIXME - I think I can sort this out by caching the credentials in the
+    # requast object, which is less hacky.  This cache is nasty.
     lastpass = [""]
+
+    # Dict-ify the hard-coded users.  Normally this will be
+    # ('agent', 'secret', 'agents') => {'agent' : ('secret': 'agents')}
+    hc = { x[0]: (x[1],x[2]) for x in hardcoded }
 
     def _passwordcheck(login, password, request):
         """ Password checking callback. """
 
         print("Checking %s:%s for %s" % (login, password, request))
         print("Lastpass is " + lastpass[0])
+        print("Hard-coded users are " + str(tuple(hc.keys())) )
 
-        #FIXME - surely 'group:agents'
-        if login == "agent" and password == "sharedsecret":
-            return ['group-agents']
+        #FIXME2 - also, shared secret should actually be a secret
+#         if login == "agent" and password == "sharedsecret":
+#             return ['group:agents']
+        if login in hc:
+            if hc[login][0] == password:
+                return ['group:' + hc[login][1]]
+            else:
+                return None
 
         elif (str(lastpass[0]) == login + ":" + password or \
-        eos_db.server.check_password(login, password)):
+            server.check_password(login, password)):
 
-            user_group = eos_db.server.get_user_group(login)[0]
+            user_group = server.get_user_group(login)
 
             print("Found user group " + user_group)
 
@@ -119,30 +121,62 @@ def passwordcheck():
 
     return _passwordcheck
 
+def get_secret(settings, secret):
+    """ Given the global settings and a name of a secret, determine the secret.
+        The secrets we need to function are the 'authtkt' secret which does not need
+        to be shared but does need to be stable, and the 'agent' secret which needs
+        to be shared with the agents.
+        On the production system these must be securely generated at startup.
+        On the test system we can use placeholder values, but in either case there
+        is no excuse for hard-coding them into the script.
+
+        :params
+        :settings dict: settings
+        :secret string: name of secret
+    """
+    #If a secret is supplied directly, use it.
+    res = settings.get(secret + ".secret", None)
+    if res is None:
+        #Else you must supply a file with just the secret inside, or an
+        #exception will be raised.
+        with open(settings.get(secret + ".secretfile")) as ssfile:
+            res = ssfile.read().rstrip('\n')
+
+    if not res:
+        raise ValueError("The secret cannot be empty.")
+    return res
+
+
 #FIXME? main takes global_config as an argument here but why?
+# Also - Is this called just once per initialisation?  Ie. can I generate my
+# shared secret here?
 def main(global_config, **settings):
     """ Set routes, authentication policies, and add callbacks to modify
     responses."""
 
+    agent_spec = [ ('agent', get_secret(settings, 'agent'), 'agents') ]
 
-    hap = HybridAuthenticationPolicy(check=passwordcheck(),
-                                     secret="Spanner", #FIXME
-                                     callback=groupfinder,
+    hap = HybridAuthenticationPolicy(check=passwordcheck(hardcoded=agent_spec),
+                                     secret=get_secret(settings, "authtkt"),
                                      realm="eos_db")
     config = Configurator(settings=settings,
                           authentication_policy=hap,
                           root_factory='eos_db.views.PermissionsMap')
 
-    config.add_subscriber(add_cors_headers_response_callback, NewRequest)
+    config.add_subscriber(add_cors_callback, NewRequest)
     config.add_subscriber(add_cookie_callback, NewRequest)
 
     # Needed to ensure proper 401 responses
     config.add_forbidden_view(hap.get_forbidden_view)
 
-    settings = config.registry.settings
-    #FIXME - server again not being called correctly here. Fix the import
-    #or the reference below.
-    server.choose_engine(settings['server'])
+    # Do this if you need extra info generated by the Configurator, but
+    # we do not.
+    #settings = config.registry.settings
+
+    # Set the engine, but only if it's not already set.  This is useful
+    # for testing where we can re-initialise the webapp while leaving the
+    # database in place.
+    server.choose_engine(settings['server'], replace=False)
 
     # Top-level home page. Yields API call list.
 

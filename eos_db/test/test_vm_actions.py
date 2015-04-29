@@ -1,13 +1,15 @@
-"""Tests for VM actions. This test suite uses webtest to interface with the
-WSGI interface normally served by Waitress.
+"""Tests for VM actions.
+This test suite avoids webtest and calls server functions directly.
 
 """
 
 import unittest
 from eos_db.server import (check_state,
                            setup_states,
+                           get_state_list,
+                           create_artifact_state,
                            deploy_tables,
-                           override_engine,
+                           choose_engine,
                            create_appliance,
                            touch_to_state,
                            touch_to_add_specification,
@@ -15,8 +17,10 @@ from eos_db.server import (check_state,
                            get_previous_specification,
                            get_state_id_by_name,
                            get_server_id_from_name,
+                           get_server_id_from_uuid,
                            return_artifact_details)
 
+# FIXME - use the list from server.py
 STATE_LIST = ["Starting",       # Machine was stopped, now starting up.
               "Stopping",       # Machine was started, now stopping.
               "Started",        # Machine is running.
@@ -24,17 +28,22 @@ STATE_LIST = ["Starting",       # Machine was stopped, now starting up.
               "Preparing",      # Stopping machine before a spec change.
               "Boosting",       # Changing specs.
               "Pre_Deboosting", # Preparing for deboost.
-              "Preparing",      # Preparing for boost.
               "Restarting",     # Restarting machine.
               "Deboosting"]     # Changing specs.
 
+# These tests are not good.  Skip them for now.
+#@unittest.skip
 class TestVMFunctions(unittest.TestCase):
     """Tests VM actions in server module.
     """
     def setUp(self):
-        override_engine('sqlite://')
+        choose_engine('SQLite')
         deploy_tables()
-        setup_states(STATE_LIST)
+
+#         for state in STATE_LIST:
+#             create_artifact_state(state)
+        #Surely:
+        setup_states()
 
 #         new_user = User(name='Test User', username='testuser', type='user', uuid='x', handle='testuser')
 #         Session = sessionmaker(bind=engine)
@@ -55,7 +64,7 @@ class TestVMFunctions(unittest.TestCase):
         """Check touch_to_state puts a server into "Started" state.
         """
         artifact_id = self.my_create_appliance("teststarted")
-        touch_to_state(artifact_id, "Started")
+        touch_to_state(None, artifact_id, "Started")
         status = check_state(artifact_id)
         self.assertEqual(status, "Started")
 
@@ -63,7 +72,7 @@ class TestVMFunctions(unittest.TestCase):
         """Check touch_to_state puts a server into "Stopped" state.
         """
         artifact_id = self.my_create_appliance("teststopped")
-        touch_to_state(artifact_id, "Stopped")
+        touch_to_state(None, artifact_id, "Stopped")
         status = check_state(artifact_id)
         self.assertEqual(status, "Stopped")
 
@@ -71,35 +80,43 @@ class TestVMFunctions(unittest.TestCase):
         """Check touch_to_state puts a server into "Starting" state.
         """
         artifact_id = self.my_create_appliance("teststart")
-        touch_to_state(artifact_id, "Starting")
+        touch_to_state(None, artifact_id, "Starting")
         status = check_state(artifact_id)
         self.assertEqual(status, "Starting")
 
-    @unittest.expectedFailure
     def test_restart_server(self):
         """Check touch_to_state puts a server into "Restarting" state.
-            ** Expected fail - Restart state was removed
         """
         artifact_id = self.my_create_appliance("testrestart")
-        touch_to_state(artifact_id, "Restart")
+        touch_to_state(None, artifact_id, "Restarting")
         status = check_state(artifact_id)
-        self.assertEqual(status, "Restart")
+        self.assertEqual(status, "Restarting")
 
     def test_preboost_server(self):
         """Check touch_to_state puts a server into "Preparing" state.
         """
         artifact_id = self.my_create_appliance("testpreboost")
-        touch_to_state(artifact_id, "Preparing")
+        touch_to_state(None, artifact_id, "Preparing")
         status = check_state(artifact_id)
         self.assertEqual(status, "Preparing")
 
+    @unittest.expectedFailure
     def test_boost_server(self):
         """Check touch_to_state puts a server into "Boosting" state.
+            ** Expected fail - Boosting state was removed
         """
         artifact_id = self.my_create_appliance("testboost")
-        touch_to_state(artifact_id, "Boosting")
+        touch_to_state(None, artifact_id, "Boosting")
         status = check_state(artifact_id)
         self.assertEqual(status, "Boosting")
+
+    def test_server_invalid_state(self):
+        """Check touch_to_state won't put a server into "BAD" state.
+        """
+        artifact_id = self.my_create_appliance("testbad")
+        #But which exception?  Currently we get a TypeError
+        with self.assertRaises(Exception):
+            touch_to_state(None, artifact_id, "BAD")
 
     def test_add_specification(self):
         """Add a specification to a machine and recall it."""
@@ -125,13 +142,21 @@ class TestVMFunctions(unittest.TestCase):
         """We expect the states created in setUp to be numbered sequentially
         """
         self.assertEqual(
-            [ get_state_id_by_name(state) for state in STATE_LIST ],
-            range(1, len(STATE_LIST)+1)
+            [ get_state_id_by_name(state) for state in get_state_list() ],
+            [ n+1 for n in range(len(get_state_list()))]
         )
 
     def test_get_server_id_from_name(self):
         artifact_id = self.my_create_appliance("getname")
         returned_id = get_server_id_from_name("getname")
+        self.assertEqual(artifact_id, returned_id)
+
+    def test_get_server_id_from_uuid(self):
+        artifact_id = self.my_create_appliance("getuuid")
+        server_details = return_artifact_details(artifact_id)
+
+        uuid = server_details['artifact_uuid']
+        returned_id = get_server_id_from_uuid(uuid)
         self.assertEqual(artifact_id, returned_id)
 
     def test_return_artifact_details(self):
@@ -141,11 +166,10 @@ class TestVMFunctions(unittest.TestCase):
         """
         artifact_id = self.my_create_appliance("returndetails")
         server_details = return_artifact_details(artifact_id)
-        self.assertEqual(server_details, {
-            'artifact_id':   artifact_id,
-            'state':         "Not yet initialised",
-            'artifact_uuid': "returndetails"
-            })
+
+        self.assertEqual(server_details['artifact_id'], artifact_id)
+        self.assertEqual(server_details['state'], "Not yet initialised")
+        self.assertEqual(server_details['artifact_name'], "returndetails")
 
 
 if __name__ == '__main__':
