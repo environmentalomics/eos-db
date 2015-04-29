@@ -286,9 +286,9 @@ def retrieve_servers(request):
     """
     Lists all artifacts related to the current user.
     """
-    print ("Servers for user: " + request.authenticated_userid)
+    #print ("Servers for user: " + request.authenticated_userid)
     server_list = server.list_artifacts_for_user(request.authenticated_userid)
-    print (server_list)
+    #print (server_list)
     return server_list
 
 @view_config(request_method="GET", route_name='state', renderer='json', permission="use")

@@ -90,7 +90,6 @@ class TestCookie(unittest.TestCase):
     def test_broken_cookie(self):
         """ The DB API should refuse to service a request with a broken cookie. """
 
-        print ("Start test...")
         self.app.authorization = ('Basic', ('testuser', 'testpass'))
         r = self.app.get("/users/testuser", status=200)
         cookie = 'I am a fish'
@@ -103,7 +102,6 @@ class TestCookie(unittest.TestCase):
     def test_invalid_cookie(self):
         """ The DB API should refuse to service a request with an invalid cookie. """
 
-        print ("Start test...")
         self.app.authorization = ('Basic', ('testuser', 'testpass'))
         r = self.app.get("/users/testuser", status=200)
         cookie = '94514a32a7923939584470e8fc01f9b073bc3c8171542c8b7deb0' + \

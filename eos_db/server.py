@@ -181,7 +181,7 @@ def get_user_group(username):
                  .order_by(Touch.touch_dt.desc())
                  .first())
         session.close()
-        print("get_user_group: User %s is in group %s" % (username, group[0]))
+        #print("get_user_group: User %s is in group %s" % (username, group[0]))
         return group[0]
     else:
         return None
@@ -668,10 +668,10 @@ def check_password(username, password):
                     .first())
     session.close()
     if our_password is None:
-        print ("No password for user")
+        #print ("No password for user")
         return False
     else:
-        print ("Checking password " + password)
+        #print ("Checking password " + password)
         return our_password.check(password)
 
 def _create_credit(touch_id, credit):

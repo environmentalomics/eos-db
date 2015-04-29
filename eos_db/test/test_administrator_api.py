@@ -275,7 +275,8 @@ class TestAdminAPI(unittest.TestCase):
 
         #This should fail because not all the states are valid.
         for state in STATES_TO_TEST:
-            print("Push result = " + str(push_to_state(state)))
+            res = push_to_state(state)
+            #print("Push result = " + str(res))
             self.assertEqual(get_state(), state)
 
     def test_retrieve_server(self):

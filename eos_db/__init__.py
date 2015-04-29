@@ -17,7 +17,9 @@ from pyramid.httpexceptions import HTTPUnauthorized
 # FIXME - when deployed we'll need to call from eoscloud.nerc.ac.uk, but that should be covered
 # as being the same origin.  In any case, this shouldn't be hard-coded I'm sure.  Maybe return
 # http://localhost:* works?
-ALLOWED_ORIGIN = ('http://localhost:6542',)
+#ALLOWED_ORIGIN = ('http://localhost:6542',)
+
+log = logging.getLogger(__name__)
 
 def add_cors_callback(event):
     """ Add response header to enable Cross-Origin Resource Sharing. The
@@ -29,16 +31,14 @@ def add_cors_callback(event):
     def cors_headers(request, response):
         """ Callback for CORS. """
 
-        log = logging.getLogger(__name__)
-        if 'Origin' in request.headers:
-            origin = request.headers['Origin']
-            print ("Origin: " + origin)
-            if origin in ALLOWED_ORIGIN:
-                log.debug('Access Allowed')
-                response.headers['Access-Control-Allow-Origin'] = origin
-                response.headers['Access-Control-Allow-Methods'] = \
-                    'GET, POST, PUT, OPTIONS, DELETE, PATCH'
-                response.headers['Access-Control-Allow-Credentials'] = 'true'
+        origin = request.headers.get('Origin', 'UNKNOWN')
+        log.debug("Origin: " + origin)
+        if origin.startswith('http://localhost:'):
+            log.debug('Access Allowed')
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Methods'] = \
+                'GET, POST, PUT, OPTIONS, DELETE, PATCH'
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
 
     event.request.add_response_callback(cors_headers)
 
@@ -53,10 +53,10 @@ def add_cookie_callback(event):
         """ Cookie callback. """
 
         if response.status[0] == '2':
-            print(remember(request, request.authenticated_userid))
+            #print(remember(request, request.authenticated_userid))
             response.headers.update(remember(request,
                                              request.authenticated_userid))
-            print(response.headers)
+            #print(response.headers)
 
     event.request.add_response_callback(cookie_callback)
 
@@ -87,13 +87,12 @@ def passwordcheck(hardcoded=()):
     def _passwordcheck(login, password, request):
         """ Password checking callback. """
 
-        print("Checking %s:%s for %s" % (login, password, request))
-        print("Lastpass is " + lastpass[0])
-        print("Hard-coded users are " + str(tuple(hc.keys())) )
+        #Do not enable these unless you need to test password stuff, as
+        #user details will be printed to STDOUT
+#         print("Checking %s:%s for %s" % (login, password, request))
+#         print("Lastpass is " + lastpass[0])
+#         print("Hard-coded users are " + str(tuple(hc.keys())) )
 
-        #FIXME2 - also, shared secret should actually be a secret
-#         if login == "agent" and password == "sharedsecret":
-#             return ['group:agents']
         if login in hc:
             if hc[login][0] == password:
                 return ['group:' + hc[login][1]]
@@ -105,7 +104,7 @@ def passwordcheck(hardcoded=()):
 
             user_group = server.get_user_group(login)
 
-            print("Found user group " + user_group)
+            log.debug("Found user group " + user_group)
 
             if user_group in ("administrators", "users", "agents"):
                 # Remember that this worked

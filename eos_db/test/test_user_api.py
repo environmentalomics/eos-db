@@ -35,8 +35,8 @@ class TestUserAPI(unittest.TestCase):
         # This will implicitly generate the tables.
         user_id = self.create_user("testuser")
 
-        print("user_id is %s" % str(user_id))
-        print("user_from_db_is %s" % server.get_user_id_from_name("testuser"))
+        #print("user_id is %s" % str(user_id))
+        #print("user_from_db_is %s" % server.get_user_id_from_name("testuser"))
 
         server.touch_to_add_password(user_id, "asdf")
 
