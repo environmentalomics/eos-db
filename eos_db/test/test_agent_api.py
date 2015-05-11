@@ -159,6 +159,14 @@ class TestAgentAPI(unittest.TestCase):
             with patch.dict('os.environ', {'agent_secretfile': "NOT_A_REAL_FILE_12345"}):
                 self.assertRaises(FileNotFoundError, get_app, test_ini)
 
+    def test_env_token_badfile(self):
+        """ If I try to reference a bad secretfile in the environment it should complain,
+            even if a valid secretfile is specified in the config file.
+            This should apply to the token secret too.
+        """
+        with patch.dict('os.environ', {'authtkt_secretfile': "NOT_A_REAL_FILE_12345"}):
+            self.assertRaises(FileNotFoundError, get_app, test_ini)
+
 
 ####### Helper code, lets me modify file contents on-the-fly.
 
