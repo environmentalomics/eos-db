@@ -258,12 +258,10 @@ def return_artifact_details(artifact_id, artifact_name="", artifact_uuid=""):
         cores, ram = "N/A", "N/A"
     if state == None:
         state = "Not yet initialised"
-    else:
-        state = state[0]
     if artifact_uuid == "":
-        artifact_uuid = get_server_uuid_by_id(artifact_id)[0]
+        artifact_uuid = get_server_uuid_from_id(artifact_id)
     if artifact_name == "":
-        artifact_name = get_server_name_from_id(artifact_id)[0]
+        artifact_name = get_server_name_from_id(artifact_id)
     return({"artifact_id": artifact_id,
             "artifact_uuid": artifact_uuid,
             "artifact_name": artifact_name,
@@ -286,23 +284,6 @@ def set_deboost(hours, touch_id):
 
     return _create_thingy(new_deboost)
 
-def list_servers_in_state(state):
-    """ Return a list of servers in the state specified. """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    servers = (session
-               .query(Artifact.uuid)
-               .filter(Touch.artifact_id == Artifact.id)
-               .filter(Touch.state_id == State.id)
-               .filter_by(name=state).all())
-    result = {}
-    for server in servers:
-        result[server[3]] = ({"user_id": server[0],
-                              "touch_id": server[1],
-                              "artifact_id": server[2]})
-    session.close()
-    return result
-
 def get_server_name_from_id(artifact_id):
     """ Get the name field from an artifact.
 
@@ -316,7 +297,7 @@ def get_server_name_from_id(artifact_id):
                      .filter(Artifact.id == artifact_id)
                      .first())
     session.close()
-    return artifact_name
+    return artifact_name[0]
 
 def get_server_id_from_name(name):
     """ Get the system ID of a server from its name.
@@ -331,9 +312,9 @@ def get_server_id_from_name(name):
     artifact_id = (session
                    .query(Artifact.id)
                    .filter(Artifact.name == name)
-                   .first())[0]
+                   .first())
     session.close()
-    return artifact_id
+    return artifact_id[0]
 
 def get_server_id_from_uuid(uuid):
     """ Get the system ID of a server from its name.
@@ -346,9 +327,9 @@ def get_server_id_from_uuid(uuid):
     artifact_id = (session
                    .query(Artifact.id)
                    .filter(Artifact.uuid == uuid)
-                   .first())[0]
+                   .first())
     session.close()
-    return artifact_id
+    return artifact_id[0]
 
 def get_user_id_from_name(name):
     """ Get the system ID of a user from his name.
@@ -365,13 +346,13 @@ def get_user_id_from_name(name):
         user_id = (session
                    .query(User.id)
                    .filter(User.username == name)
-                   .first())[0]
+                   .first())
     except:
         pass #Convert this to a KeyError in just a sec...
     session.close()
-    if user_id is None:
+    if user_id[0] is None:
         raise KeyError("No such user")
-    return user_id
+    return user_id[0]
 
 def _get_server_boost_status(artifact_id):
     """ Return the boost status (either "Boosted" or "Unboosted" of the given
@@ -416,7 +397,7 @@ def get_deboost_credits(artifact_id):
     session.close()
     return deboost_credits
 
-def list_server_in_state(state):
+def list_servers_in_state(state):
     """ Iterates through servers until it finds a server in the state
     requested.
 
@@ -426,12 +407,12 @@ def list_server_in_state(state):
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
     servers = session.query(Artifact.id).all()
-    stated_server = None
+    matching_servers = []
     for server in servers:
-        if _get_most_recent_artifact_state(server[0])[0] == state:
-            stated_server = server[0]
+        if _get_most_recent_artifact_state(server[0]) == state:
+            matching_servers.append(server[0])
     session.close()
-    return stated_server
+    return matching_servers
 
 def touch_to_add_ownership(artifact_id, user_id):
     """ Adds an ownership resource to an artifact, effectively linking the VM
@@ -446,7 +427,7 @@ def touch_to_add_ownership(artifact_id, user_id):
     ownership_id = create_ownership(touch_id, user_id)
     return ownership_id
 
-def get_server_uuid_by_id(id):
+def get_server_uuid_from_id(id):
     """ Get the uuid field from an artifact.
 
     :param artifact_id: A valid artifact id.
@@ -456,7 +437,7 @@ def get_server_uuid_by_id(id):
     session = Session()
     server = session.query(Artifact.uuid).filter(Artifact.id == id).first()
     session.close()
-    return server
+    return server[0]
 
 def check_ownership(artifact_id, actor_id):
     """ Check if an artifact belongs to a given user.
@@ -744,11 +725,8 @@ def check_user_details(user_id):
 def check_state(artifact_id):
     """ Return None is the artifact has no state assignned to it. Otherwise,
     return the most recent state. """
-    state = _get_most_recent_artifact_state(artifact_id)
-    if state is None:
-        return None
-    else:
-        return state[0]
+    #FIXME - this function is pointless and should be factored out.
+    return _get_most_recent_artifact_state(artifact_id)
 
 def _list_artifacts_for_user(user_id):
     """Generates a list of artifacts associated with the user_id.
@@ -815,4 +793,4 @@ def _get_most_recent_artifact_state(artifact_id):
              .order_by(Touch.touch_dt.desc())
              .first())
     session.close()
-    return state
+    return state[0] if state else None

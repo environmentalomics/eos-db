@@ -296,9 +296,13 @@ def retrieve_servers_in_state(request):
     """
     Lists all servers in a given state.
     """
-    server_id = server.list_server_in_state(request.GET['state'])
-    server_uuid = server.get_server_uuid_by_id(server_id)
-    return {"artifact_id": server_id, "artifact_uuid":server_uuid}
+    server_ids = server.list_servers_in_state(request.matchdict['name'])
+    server_uuid = [ server.get_server_uuid_from_id(s_id) for s_id in server_ids ]
+    server_name = [ server.get_server_name_from_id(s_id) for s_id in server_ids ]
+    return [ { "artifact_id"   : s[0],
+               "artifact_uuid" : s[1],
+               "artifact_name" : s[2] }
+             for s in zip(server_ids, server_uuid, server_name) ]
 
 @view_config(request_method="PUT", route_name='server', renderer='json', permission="administer")
 def create_server(request):
