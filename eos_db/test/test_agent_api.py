@@ -98,6 +98,10 @@ class TestAgentAPI(unittest.TestCase):
         #Re-read the .ini to find out the secret.
         settings = get_appsettings(test_ini)
 
+        #This should not be the same as what's in secret-file.txt.
+        #Actually, I already tested this above, no matter.
+        # self.assertNotEqual(settings['agent.secret'], 'testsharedsecret')
+
         app.authorization = ('Basic', ('agent', settings['agent.secret']))
 
         r = app.get("/users/testuser/credit")
@@ -128,7 +132,33 @@ class TestAgentAPI(unittest.TestCase):
         """
         with patch('builtins.open',
                    filter_open(TestAgentAPI._ini_filter_del, pattern=r'\.ini$', verbose=False)):
-            self.assertRaises(TypeError, get_app, test_ini)
+            self.assertRaises(ValueError, get_app, test_ini)
+
+    def test_env_secretfile(self):
+        """ I should be able to supply the secret in the environment and it should
+            override the config file.
+        """
+        #Don't do this, it stays set and breaks other tests
+        #os.environ['agent_secretfile'] = secret_file
+        #Do this...
+        with patch.dict('os.environ', {'agent_secretfile': secret_file}):
+           app = TestApp(get_app(test_ini))
+
+        # We know what's in the secret_file; see the first test above
+        app.authorization = ('Basic', ('agent', 'testsharedsecret'))
+
+        r = app.get("/users/testuser/credit")
+        self.assertEqual(r.json['credit_balance'], 200)
+
+    def test_env_badfile(self):
+        """ If I try to reference a bad secretfile in the environment it should complain,
+            even if a valid secretfile is specified in the config file.
+        """
+        with patch('builtins.open',
+                   filter_open(TestAgentAPI._ini_filter, pattern=r'\.ini$', verbose=False)):
+            with patch.dict('os.environ', {'agent_secretfile': "NOT_A_REAL_FILE_12345"}):
+                self.assertRaises(FileNotFoundError, get_app, test_ini)
+
 
 ####### Helper code, lets me modify file contents on-the-fly.
 

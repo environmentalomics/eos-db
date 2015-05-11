@@ -5,7 +5,7 @@ Database and API server for Cloudhands-EOS system.
 
 
  ```sh
- $ apt-get install python3.4-dev postgresql libpq-dev libffi-dev
+ $ sudo apt-get install python3.4-dev postgresql libpq-dev libffi-dev
  ```
 
  ```sh

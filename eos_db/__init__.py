@@ -133,13 +133,20 @@ def get_secret(settings, secret):
         :settings dict: settings
         :secret string: name of secret
     """
-    #If a secret is supplied directly, use it.
-    res = settings.get(secret + ".secret", None)
-    if res is None:
-        #Else you must supply a file with just the secret inside, or an
-        #exception will be raised.
-        with open(settings.get(secret + ".secretfile")) as ssfile:
+    #Setting a secretfile in the environment trumps any settings, or
+    #else look for a secretfile in the settings.
+    secretfile = ( os.environ.get(secret + "_secretfile") or
+                   settings.get(secret + ".secretfile") )
+
+    res = None
+    if secretfile:
+        #If you specify one the file must exist, or an exception will be raised,
+        #but there is no check on the actual file contents.
+        with open(secretfile) as ssfile:
             res = ssfile.read().rstrip('\n')
+    else:
+        #If a secret is supplied directly, use it.
+        res = settings.get(secret + ".secret")
 
     if not res:
         raise ValueError("The secret cannot be empty.")
