@@ -5,8 +5,8 @@ blurb = \
 
 Permissible instructions:
 
-eos-admin adduser <username> <password> <realname>:
-    Add a user with the specified password.
+eos-admin adduser <username> <realname>:
+    Add a user with the specified details, then prompts for a password.
 
 eos-admin addvm <username> [server_name [server_uuid]] :
     Add a particular server to a user's account.
@@ -106,22 +106,18 @@ if arg[0] == 'adduser':
 
     try:
         username = arg[1]
-        password = arg[2]
-        realname = arg[3]
+        realname = arg[2]
     except IndexError:
-        sys.exit("Failed. Ensure you enter a username, password and real name.")
+        sys.exit("Failed. Ensure you enter a username and real name.")
 
     try:
         #All users are created as type "user"
+        #FIXME - we need an e-mail address too.
         id = server.create_user("users", username, realname, username)
         print ("New user created with id %s" % id)
-        server.touch_to_add_password(id, password)
 
-        #Sanity check...
-        if server.check_password(username, password):
-            print("User %s password set." % (username))
-        else:
-            print("Failed to set the password!")
+        arg = ["changepwd", username]
+
     except Exception as e:
         #Suppress stack trace.
         sys.exit("Error: " + str(e))
@@ -181,7 +177,8 @@ elif arg[0] == 'addcredit':
     credits_now = server.check_credit(username)
     print("User %s now has %i credits." % (username, credits_now))
 
-elif arg[0] == 'changepwd':
+#if not elif, since creating a user might set this off
+if arg[0] == 'changepwd':
     print ("Changing password...")
 
     try:
