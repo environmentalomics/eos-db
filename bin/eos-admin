@@ -236,5 +236,5 @@ elif arg[0] == 'setgroup':
     server.touch_to_add_user_group(username, group)
     print("User %s is now in group %s (was %s)." % (username, group, oldgroup))
 
-else:
+elif arg[0] == 'help':
     print (blurb)
