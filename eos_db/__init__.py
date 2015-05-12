@@ -142,7 +142,7 @@ def get_secret(settings, secret):
     if secretfile:
         #If you specify one the file must exist, or an exception will be raised,
         #but there is no check on the actual file contents.
-        log.warning("Getting secret from " + secretfile)
+        log.debug("Getting secret from " + secretfile)
         with open(secretfile) as ssfile:
             res = ssfile.read().rstrip('\n')
     else:

@@ -353,7 +353,7 @@ def get_user_id_from_name(name):
     except:
         pass #Convert this to a KeyError in just a sec...
     session.close()
-    if user_id[0] is None:
+    if not user_id:
         raise KeyError("No such user")
     return user_id[0]
 
