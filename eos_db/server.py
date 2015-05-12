@@ -29,12 +29,15 @@ try:
 except:
     pass
 
-# FIXME - use this thing!!
+# FIXME - fix and then use this thing!!
 def with_session(f):
-    """Decorator that automatically passes a session to a function and then shuts
-       the session down at the end, unless a session was already passed in.
+    """Decorator that automatically passes a Session to a function and then shuts
+       the session down at the end, unless a session was already passed thorugh.
+       The decorator takes no arguments.
     """
     def inner(*args, **kwargs):
+        #Note that if session is passed in kwargs the local session
+        #variable is never set and therefore is left for the caller to close.
         session = None
         if not session in kwargs:
             Session = sessionmaker(bind=engine, expire_on_commit=True)

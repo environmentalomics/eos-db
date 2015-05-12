@@ -5,7 +5,7 @@ blurb = \
 
 Permissible instructions:
 
-eos-admin adduser <username> <password> [realname]:
+eos-admin adduser <username> <password> <realname>:
     Add a user with the specified password.
 
 eos-admin addvm <username> [server_name [server_uuid]] :
@@ -16,6 +16,9 @@ eos-admin addcredit <username> <credit> :
 
 eos-admin changepwd <username> [password] :
     Change a user's password.
+
+eos-admin setgroup <username> users|administrators :
+    Change a user's group.
 
 """
 
@@ -104,9 +107,9 @@ if arg[0] == 'adduser':
     try:
         username = arg[1]
         password = arg[2]
-        realname = arg[3] if arg[3:] else username
+        realname = arg[3]
     except IndexError:
-        sys.exit("Failed. Ensure you enter a username and password.")
+        sys.exit("Failed. Ensure you enter a username, password and real name.")
 
     try:
         #All users are created as type "user"
@@ -205,6 +208,35 @@ elif arg[0] == 'changepwd':
         print("User %s password set." % (username))
     else:
         print("Failed to set the password!")
+
+elif arg[0] == 'setgroup':
+    print ("Setting group...")
+
+    try:
+        username = arg[1]
+        group = arg[2]
+    except IndexError:
+        sys.exit("Failed. Both username and group must be specified.")
+
+    oldgroup = "NONE"
+    try:
+        oldgroup = server.get_user_group(username)
+    except TypeError:
+        sys.exit("No such user.")
+
+    #Sanity check...
+    if 'users'.startswith(group):
+        group = 'users'
+    elif 'administrator'.startswith(group):
+        group = 'administrators'
+    else:
+        sys.exit("Failed. You specified an invalid group name.")
+
+    if oldgroup == group:
+        sys.exit("Failed. User %s is already in group %s." % (username, group))
+
+    server.touch_to_add_user_group(username, group)
+    print("User %s is now in group %s (was %s)." % (username, group, oldgroup))
 
 else:
     print (blurb)
