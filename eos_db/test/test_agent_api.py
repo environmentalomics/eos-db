@@ -70,7 +70,7 @@ class TestAgentAPI(unittest.TestCase):
         self.assertEqual(settings1['agent.secret'], 'sharedsecret')
 
         with patch('builtins.open',
-                   filter_open(TestAgentAPI._ini_filter, pattern=r'\.ini$', verbose=False)):
+                   filter_open(TestAgentAPI._ini_filter, pattern=r'test\.ini$', verbose=False)):
             settings2 = get_appsettings(test_ini)
 
         self.assertEqual(settings2.get('agent.secret', 'None'), 'None')
@@ -115,7 +115,7 @@ class TestAgentAPI(unittest.TestCase):
         """
         #self test 2 above confirms that this sets the agent.secretfile correctly
         with patch('builtins.open',
-                   filter_open(TestAgentAPI._ini_filter, pattern=r'\.ini$', verbose=False)):
+                   filter_open(TestAgentAPI._ini_filter, pattern=r'test\.ini$', verbose=False)):
             appconf = get_app(test_ini)
 
         app = TestApp(appconf)

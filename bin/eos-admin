@@ -174,8 +174,8 @@ elif arg[0] == 'addcredit':
         sys.exit("No such user.")
     server.touch_to_add_credit(user_id, credit)
 
-    #For some reason this call needs the username, not the ID.
-    credits_now = server.check_credit(username)
+    #check_credit now changed to need the user ID, not the name
+    credits_now = server.check_credit(user_id)
     print("User %s now has %i credits." % (username, credits_now))
 
 #if not elif, since creating a user might set this off
