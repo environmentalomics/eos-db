@@ -344,14 +344,10 @@ def get_user_id_from_name(name):
     # properly set.
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    user_id = None
-    try:
-        user_id = (session
-                   .query(User.id)
-                   .filter(User.username == name)
-                   .first())
-    except:
-        pass #Convert this to a KeyError in just a sec...
+    user_id = (session
+               .query(User.id)
+               .filter(User.username == name)
+               .first())
     session.close()
     if not user_id:
         raise KeyError("No such user")
