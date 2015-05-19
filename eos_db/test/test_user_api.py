@@ -47,6 +47,7 @@ class TestUserAPI(unittest.TestCase):
         server.touch_to_add_password(user_id, "asdf")
 
         # And log in as this user for all tests (via BasicAuth)
+        # FIXME - switch to token auth to speed up the tests.
         self.app.authorization = ('Basic', ('testuser', 'asdf'))
 
     """Unauthenticated API functions.
@@ -96,6 +97,7 @@ class TestUserAPI(unittest.TestCase):
 
         self.assertEqual(self.app.get('/users/anotheruser').json['name'], "anotheruser anotheruser")
 
+    #FIXME - this should be supported.
     @unittest.skip
     def test_retrieve_users(self):
         """ Add another couple of users. Three records should be returned, as
@@ -109,12 +111,12 @@ class TestUserAPI(unittest.TestCase):
         self.assertEqual(len(response.json), 3)
 
     #Unimplemented just now.
-    @unittest.skip
+    @unittest.expectedFailure
     def test_delete_user(self):
         """ Delete a user. Should fail because the account does not have permission.
         """
         self.create_user("anotheruser")
-        response = self.app.delete('/users/anotheruser', status=500)
+        response = self.app.delete('/users/anotheruser', status=404)
 
 
     def test_change_my_password(self):
@@ -142,13 +144,6 @@ class TestUserAPI(unittest.TestCase):
                                 {'password': 'newpass'},
                                 status=401)
 
-    @unittest.skip
-    def test_retrieve_user_touches(self):
-        """ Retrieve a list of touches that the user has made to the database.
-        This can only be requested by the user themselves, an agent or an
-        administrator. """
-
-    @unittest.skip
     def test_retrieve_user_credit(self):
         """ If administrator adds credit, I should be able to see it.
             See full credit tests in test_credit.py
@@ -163,10 +158,6 @@ class TestUserAPI(unittest.TestCase):
 
         self.assertEqual( response.json, user_json )
 
-    @unittest.skip
-    def test_retrieve_user_credit(self):
-        """ A user can request the amount of credit that they have on account.
-        """
 
     def test_retrieve_servers(self):
         """ A user can request a list of servers that they own.
@@ -180,13 +171,16 @@ class TestUserAPI(unittest.TestCase):
         self.assertEqual(len(my_servers), 1)
         self.assertEqual(my_servers[0]['artifact_name'], 'fooserver')
 
-    @unittest.skip
+    def test_retrieve_user_touches(self):
+        """ Retrieve a list of touches that the user has made to the database.
+        This can only be requested by the user themselves, an agent or an
+        administrator. """
+
     def test_create_server(self):
         """ A regular user cannot create a server or give themselves ownership
-            of a server.
+            of a server, so this should produce an appropriate error.
         """
 
-    @unittest.skip
     def test_create_server_owner(self):
         """ Add an owner to a server. Ensure that a 200 OK response results.
         """
@@ -194,89 +188,90 @@ class TestUserAPI(unittest.TestCase):
 
     """ Server State-Change Functions. """
 
-    @unittest.skip
     def test_retrieve_servers_in_state(self):
         """ 200 OK from this call for all legal states."""
         #FIXME - move this to agent tests.
 
-    @unittest.skip
     def test_start_server(self):
-        """ Check that a server appears in state 'Started' after using the
+        """ Check that a server appears in state 'Starting' after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
+        server.setup_states()
+        server_id = self.create_server('fooserver', 'testuser')
+        self.app.post('/servers/fooserver/Starting')
 
-    @unittest.skip
+        #1 - server should appear to be Starting in list of my servers.
+        my_servers = self.app.get('/servers').json
+        self.assertEqual(len(my_servers), 1)
+        self.assertEqual(my_servers[0]['state'], 'Starting')
+
+        #2 - server should appear to be Starting if I look at it directly
+        my_server = self.app.get('/servers/fooserver').json
+        self.assertEqual(my_server['state'], 'Starting')
+
+        #3 - server should appear as the only server in state Starting
+        servers_in_state = self.app.get('/states/Starting').json
+        self.assertEqual(len(servers_in_state), 1)
+        self.assertEqual(servers_in_state[0]['artifact_name'], 'fooserver')
+
     def test_restart_server(self):
         """ Check that a server appears in state 'Restarted' after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
-    @unittest.skip
     def test_stop_server(self):
         """ Check that a server appears in state 'Stopped' after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
-    @unittest.skip
     def test_prepare_server(self):
         """ Check that a server appears in state 'Prepared' after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
-    @unittest.skip
     def test_pre_deboost_server(self):
         """ Check that a server appears in relevant state after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
-    @unittest.skip
     def test_boost_server(self):
         """ Check that a server appears in relevant state after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
-    @unittest.skip
     def test_stopped_server(self):
         """ Check that a server appears in relevant state after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
-    @unittest.skip
     def test_started_server(self):
         """ Check that a server appears in relevant state after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
-    @unittest.skip
     def test_prepared_server(self):
         """ Check that a server appears in relevant state after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
-    @unittest.skip
     def test_predeboosted_server(self):
         """ Check that a server appears in relevant state after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
-    @unittest.skip
     def test_retrieve_server(self):
         """ Pull back details of our server by name. """
 
-    @unittest.skip
     def test_retrieve_server_by_id(self):
         """ Our server will have ID 1. Check that we can retrieve details of
         it."""
 
-    @unittest.skip
     def test_update_server(self):
         """ Not currently implemented. """
 
-    @unittest.skip
     def test_delete_server(self):
         """ Not currently implemented. """
 
-    @unittest.skip
     def test_set_server_specification(self):
         """ Follows hard-coded rules for machine behaviour.
         Set machine CPUs to 2. Check, should pass.
@@ -284,15 +279,12 @@ class TestUserAPI(unittest.TestCase):
         Set machine RAM to 16. Check, should pass.
         Set machine RAM to 65000. Check, should fail."""
 
-    @unittest.skip
     def test_get_server_specification(self):
         """ Check that machine RAM and Cores are 2 and 16 as above. """
 
-    @unittest.skip
     def test_retrieve_job_progress(self):
         """ Not currently implemented. """
 
-    @unittest.skip
     def test_retrieve_server_touches(self):
         """ Not currently implemented. """
 

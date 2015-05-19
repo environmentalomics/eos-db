@@ -60,9 +60,9 @@ def home_view(request):
                               "server": "/servers/{name}",  # Get server details or
                               "server_by_id": "/servers/by_id/{name}",
                               "states": "/states/{name}",  # Get list of servers in given state.
-                              "server_start": "/servers/{name}/start",
-                              "server_stop": "/servers/{name}/stop",
-                              "server_restart": "/servers/{name}/restart",
+                              "Start a server": "/servers/{name}/Starting",
+                              "Stop a server": "/servers/{name}/Stopping",
+                              "Restart a server": "/servers/{name}/Restarting",
                               "server_pre_deboost": "/servers/{name}/pre_deboosting",
                               "server_pre_deboosted": "/servers/{name}/Pre_deboosted",
                               "server_deboost": "/servers/{name}/deboosting",
@@ -103,9 +103,9 @@ def options2(request):
     resp.headers['Allow'] = "HEAD,GET,POST,OPTIONS"
     return resp
 
-@view_config(request_method="OPTIONS", route_name='server_start')
-@view_config(request_method="OPTIONS", route_name='server_stop')
-@view_config(request_method="OPTIONS", route_name='server_restart')
+@view_config(request_method="OPTIONS", route_name='server_Starting')
+@view_config(request_method="OPTIONS", route_name='server_Stopping')
+@view_config(request_method="OPTIONS", route_name='server_Restarting')
 @view_config(request_method="OPTIONS", route_name='server_pre_deboost')
 @view_config(request_method="OPTIONS", route_name='server_prepare')
 def options3(request):
@@ -259,11 +259,11 @@ def create_user_credit(request):
 # Not sure if Ben was in the process of folding credit balance into user details
 # or splitting it out.  I vote for folding it in.
 # DELETEME
-# 
+#
 # @view_config(request_method="GET", route_name='my_credit', renderer='json', permission="use")
 # def retrieve_my_credit(request):
 #     """Return credits outstanding for current user.
-# 
+#
 #     :returns: JSON containing actor_id and current balance.
 #     """
 #     username = request.authenticated_userid
@@ -375,22 +375,27 @@ def _set_server_state(request, target_state):
     """Basic function for putting a server into some state, but not all state-change calls
        are this simple."""
     actor_id = None
+    vm_id = None
     try:
         actor_id = server.get_user_id_from_name(request.authenticated_userid)
     except:
         #OK, it must be an agent or an internal call.
         pass
-    vm_id = server.get_server_id_from_name(request.matchdict['name'])
+    try:
+        vm_id = server.get_server_id_from_name(request.matchdict['name'])
+    except:
+        #Presumably because there is no such VM
+        return HTTPNotFound()
 
     if ( request.has_permission('act') or
-         check_ownership(vm_id, actor_id) ):
+         server.check_ownership(vm_id, actor_id) ):
         touch_id = server.touch_to_state(actor_id, vm_id, target_state)
         return touch_id
     else:
-        return HTTPUnauthorized
+        return HTTPUnauthorized()
 
 
-@view_config(request_method="POST", route_name='server_start', renderer='json', permission="use")
+@view_config(request_method="POST", route_name='server_Starting', renderer='json', permission="use")
 def start_server(request):
     """Put a server into the "Starting" status.
 
@@ -401,7 +406,7 @@ def start_server(request):
     #returning the touch id.  Same for all similar functions.
     return _set_server_state(request, "Starting")
 
-@view_config(request_method="POST", route_name='server_restart', renderer='json', permission="use")
+@view_config(request_method="POST", route_name='server_Restarting', renderer='json', permission="use")
 def restart_server(request):
     """Put a server into the "Restarting" status.
 
@@ -410,7 +415,7 @@ def restart_server(request):
     """
     return _set_server_state(request, "Restarting")
 
-@view_config(request_method="POST", route_name='server_stop', renderer='json', permission="use")
+@view_config(request_method="POST", route_name='server_Stopping', renderer='json', permission="use")
 def stop_server(request):
     """Put a server into the "Stopping" status.
 

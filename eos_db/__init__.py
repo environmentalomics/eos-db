@@ -22,8 +22,9 @@ from pyramid.httpexceptions import HTTPUnauthorized
 log = logging.getLogger(__name__)
 
 def add_cors_callback(event):
-    """ Add response header to enable Cross-Origin Resource Sharing. The
-    calling domain is checked against the tuple ALLOWED_ORIGIN, and if it
+    """ Add response header to enable Cross-Origin Resource Sharing.  This
+    should only be needed for testing, where the server is running on localhost.
+    The calling domain is checked to see if it is local, and if it
     matches, then a set of allow headers are sent, allowing the origin, the
     set of methods, and the passing of credentials, which is essential for
     the pass-through token auth which we use for security. """
@@ -32,13 +33,15 @@ def add_cors_callback(event):
         """ Callback for CORS. """
 
         origin = request.headers.get('Origin', 'UNKNOWN')
-        log.debug("Origin: " + origin)
-        if origin.startswith('http://localhost:'):
+        log.debug("Sending CORS for origin: " + origin)
+        if(origin.startswith('http://localhost:') or
+           origin.startswith('http://127.0.0.1:') ):
             log.debug('Access Allowed')
             response.headers['Access-Control-Allow-Origin'] = origin
             response.headers['Access-Control-Allow-Methods'] = \
                 'GET, POST, PUT, OPTIONS, DELETE, PATCH'
-            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            response.headers['Access-Control-Allow-Headers'] = 'auth_tkt'
+            response.headers['Access-Control-Allow-Credentials'] = 'false'
 
     event.request.add_response_callback(cors_headers)
 
@@ -228,6 +231,7 @@ def main(global_config, **settings):
                                                     # Post new server or
                                                     # Delete server
 
+    #FIXME - do I need this?
     config.add_route('server_by_id', '/servers/by_id/{name}')
 
     # Server state-related calls.
@@ -243,9 +247,9 @@ def main(global_config, **settings):
     # Looking at views.py, there is custom logic, so for example if you set
     # a server Boosting it will set up a deboost and also change the credit.
     # But I strongly suspect that Ben's logic is broken here.
-    config.add_route('server_start',         '/servers/{name}/Starting')
-    config.add_route('server_stop',          '/servers/{name}/Stopping')
-    config.add_route('server_restart',       '/servers/{name}/Restarting')
+    config.add_route('server_Starting',      '/servers/{name}/Starting')
+    config.add_route('server_Stopping',      '/servers/{name}/Stopping')
+    config.add_route('server_Restarting',    '/servers/{name}/Restarting')
     config.add_route('server_pre_deboost',   '/servers/{name}/Pre_Deboosting')
     config.add_route('server_pre_deboosted', '/servers/{name}/Pre_Deboosted')
     config.add_route('server_started',       '/servers/{name}/Started')

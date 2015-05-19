@@ -449,8 +449,9 @@ def check_ownership(artifact_id, actor_id):
     session = Session()
     our_ownership = (session
                      .query(Ownership)
+                     .filter(Ownership.user_id == actor_id)
                      .filter(Ownership.touch_id == Touch.id)
-                     .filter(Touch.actor_id == actor_id)
+                     .filter(Touch.artifact_id == artifact_id)
                      .order_by(Touch.id.desc())
                      .first())
     session.close()
