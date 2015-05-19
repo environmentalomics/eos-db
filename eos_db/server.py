@@ -679,7 +679,8 @@ def check_credit(actor_id):
 
     :param actor_id: The system id of the user or actor for whom we are \
     requesting credit details.
-    :returns: Current credit balance.
+    :returns: Current credit balance.  If there is no credit record for the \
+              user will return zero.
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
@@ -690,7 +691,7 @@ def check_credit(actor_id):
               .filter(Actor.id == actor_id)
               .scalar())
     session.close()
-    return credit
+    return credit or 0
 
 def check_actor_id(actor_id):
     """Checks to ensure an actor exists.

@@ -71,12 +71,17 @@ class TestAdminAPI(unittest.TestCase):
 
         newuser2 = self.app.get('/users/testuser', status=200).json
 
+        #Fold real user name into dict and remove type
         newuser['username'] = 'testuser'
         del(newuser['type'])
+
+        #User id should be 1, but we'll ignore it.  Ditto credits.
         del(newuser2['id'])
+        del(newuser2['credits'])
 
         self.assertEqual(newuser2, newuser)
 
+        #There should be no user named 'ignored'
         self.app.get('/users/ignored', status=404)
 
     def test_get_my_details(self):

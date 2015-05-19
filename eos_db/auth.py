@@ -12,7 +12,7 @@
 
 from pyramid.authentication import (BasicAuthAuthenticationPolicy,
                                     AuthTktAuthenticationPolicy)
-from pyramid.httpexceptions import HTTPUnauthorized
+from pyramid.httpexceptions import HTTPUnauthorized, HTTPRequestTimeout
 
 from eos_db import server
 import bcrypt
@@ -57,6 +57,7 @@ class HybridAuthenticationPolicy():
         self.bap = BasicAuthAuthenticationPolicy(check, realm)
         self.tap = AuthTktAuthenticationPolicy(secret,
                                                callback,
+                                               cookie_name='auth_tkt',
                                                hashalg='sha256')
 
     def unauthenticated_userid(self, request):
@@ -64,6 +65,10 @@ class HybridAuthenticationPolicy():
             not exist, then check the basic auth header, and return that, if it
             exists.
         """
+        #Allow forcing the auth_tkt cookie.
+        #FIXME - move this to a callback so it only happens once.
+        if request.headers.get('auth_tkt'):
+            request.cookies['auth_tkt'] = request.headers['auth_tkt']
 
         userid = self.tap.unauthenticated_userid(request)
         if userid:
@@ -84,6 +89,9 @@ class HybridAuthenticationPolicy():
         """ Return the Auth Ticket user ID if that exists. If not, then check
             for a user ID in Basic Auth.
         """
+        #Allow forcing the auth_tkt cookie.
+        if request.headers.get('auth_tkt'):
+            request.cookies['auth_tkt'] = request.headers['auth_tkt']
 
         userid = self.tap.authenticated_userid(request)
         #if userid: print ("Token Authd UserID: " + userid)
@@ -101,8 +109,12 @@ class HybridAuthenticationPolicy():
         precedence. """
 
         #FIXME - I can't see that this will work.  In both cases the principals
-        # should be calculsted based off authenticated_userid by calling the
+        # should be calculated based off authenticated_userid by calling the
         # callback.  Add tests to be sure!
+
+        #Allow forcing the auth_tkt cookie.
+        if request.headers.get('auth_tkt'):
+            request.cookies['auth_tkt'] = request.headers['auth_tkt']
 
         #print ("Principals")
         userid = self.tap.authenticated_userid(request)
@@ -134,6 +146,8 @@ class HybridAuthenticationPolicy():
 
         # FIXME - this doesn't distinguish between unauthenticated and
         # unauthorized.  Should it?
+        if request.headers.get('auth_tkt'):
+            return HTTPRequestTimeout()
 
         #print ("Access Forbidden")
         response = HTTPUnauthorized()

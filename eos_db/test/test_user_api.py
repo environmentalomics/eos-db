@@ -34,6 +34,12 @@ class TestUserAPI(unittest.TestCase):
         # Punch in new user account with direct server call
         # This will implicitly generate the tables.
         user_id = self.create_user("testuser")
+        #Here is what the user should look like when inspected
+        self.user_json =  { "name"    : "testuser testuser",
+                            "handle"  : "testuser@example.com",
+                            "id"      : 1,
+                            "credits" : 0,
+                            "username": "testuser"}
 
         #print("user_id is %s" % str(user_id))
         #print("user_from_db_is %s" % server.get_user_id_from_name("testuser"))
@@ -71,11 +77,7 @@ class TestUserAPI(unittest.TestCase):
 
         #We expect to be user 1, as the database is fresh.
         #All other items should be as per create_user("testuser")
-        self.assertEqual( response.json,
-                          { "name":   "testuser testuser",
-                            "handle": "testuser@example.com",
-                            "id": 1,
-                            "username": "testuser"} )
+        self.assertEqual( response.json, self.user_json )
 
     def test_retrieve_my_info(self):
         """ Retrieving my own user info by name should give the same result
@@ -85,11 +87,7 @@ class TestUserAPI(unittest.TestCase):
 
         #We expect to be user 1, as the database is fresh.
         #All other items should be as per create_user("testuser")
-        self.assertEqual( response.json,
-                          { "name":   "testuser testuser",
-                            "handle": "testuser@example.com",
-                            "id": 1,
-                            "username": "testuser"} )
+        self.assertEqual( response.json, self.user_json )
 
     def test_retrieve_other_user_info(self):
         """ Retrieving info for another user should respond 200 OK. """
@@ -144,98 +142,141 @@ class TestUserAPI(unittest.TestCase):
                                 {'password': 'newpass'},
                                 status=401)
 
+    @unittest.skip
     def test_retrieve_user_touches(self):
         """ Retrieve a list of touches that the user has made to the database.
         This can only be requested by the user themselves, an agent or an
         administrator. """
 
-    def test_create_user_credit(self):
-        """ Add credit to a user's account. This can only be done by an
-        administrator."""
+    @unittest.skip
+    def test_retrieve_user_credit(self):
+        """ If administrator adds credit, I should be able to see it.
+            See full credit tests in test_credit.py
+        """
+        self.add_credit(123, 'testuser')
 
+        #And retrieve it back
+        response = self.app.get('/user')
+
+        user_json = self.user_json.copy()
+        user_json['credits'] = 123
+
+        self.assertEqual( response.json, user_json )
+
+    @unittest.skip
     def test_retrieve_user_credit(self):
         """ A user can request the amount of credit that they have on account.
         """
 
     def test_retrieve_servers(self):
-        """ A user can request a list of servers that they own. An
-        administrator can list all the servers. """
+        """ A user can request a list of servers that they own.
+        """
+        server_id = self.create_server('fooserver', 'testuser')
 
+        my_servers = self.app.get('/servers').json
+
+        self.assertTrue(server_id)
+
+        self.assertEqual(len(my_servers), 1)
+        self.assertEqual(my_servers[0]['artifact_name'], 'fooserver')
+
+    @unittest.skip
     def test_create_server(self):
-        """ Create a server. Ensure that a 200 OK response results. """
+        """ A regular user cannot create a server or give themselves ownership
+            of a server.
+        """
 
+    @unittest.skip
     def test_create_server_owner(self):
         """ Add an owner to a server. Ensure that a 200 OK response results.
         """
+        #FIXME - move this to administrator tests.
 
     """ Server State-Change Functions. """
 
+    @unittest.skip
     def test_retrieve_servers_in_state(self):
         """ 200 OK from this call for all legal states."""
+        #FIXME - move this to agent tests.
 
+    @unittest.skip
     def test_start_server(self):
         """ Check that a server appears in state 'Started' after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
+    @unittest.skip
     def test_restart_server(self):
         """ Check that a server appears in state 'Restarted' after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
+    @unittest.skip
     def test_stop_server(self):
         """ Check that a server appears in state 'Stopped' after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
+    @unittest.skip
     def test_prepare_server(self):
         """ Check that a server appears in state 'Prepared' after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
+    @unittest.skip
     def test_pre_deboost_server(self):
         """ Check that a server appears in relevant state after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
+    @unittest.skip
     def test_boost_server(self):
         """ Check that a server appears in relevant state after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
+    @unittest.skip
     def test_stopped_server(self):
         """ Check that a server appears in relevant state after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
+    @unittest.skip
     def test_started_server(self):
         """ Check that a server appears in relevant state after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
+    @unittest.skip
     def test_prepared_server(self):
         """ Check that a server appears in relevant state after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
+    @unittest.skip
     def test_predeboosted_server(self):
         """ Check that a server appears in relevant state after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
 
+    @unittest.skip
     def test_retrieve_server(self):
         """ Pull back details of our server by name. """
 
+    @unittest.skip
     def test_retrieve_server_by_id(self):
         """ Our server will have ID 1. Check that we can retrieve details of
         it."""
 
+    @unittest.skip
     def test_update_server(self):
         """ Not currently implemented. """
 
+    @unittest.skip
     def test_delete_server(self):
         """ Not currently implemented. """
 
+    @unittest.skip
     def test_set_server_specification(self):
         """ Follows hard-coded rules for machine behaviour.
         Set machine CPUs to 2. Check, should pass.
@@ -243,12 +284,15 @@ class TestUserAPI(unittest.TestCase):
         Set machine RAM to 16. Check, should pass.
         Set machine RAM to 65000. Check, should fail."""
 
+    @unittest.skip
     def test_get_server_specification(self):
         """ Check that machine RAM and Cores are 2 and 16 as above. """
 
+    @unittest.skip
     def test_retrieve_job_progress(self):
         """ Not currently implemented. """
 
+    @unittest.skip
     def test_retrieve_server_touches(self):
         """ Not currently implemented. """
 
@@ -260,11 +304,20 @@ class TestUserAPI(unittest.TestCase):
         #Since we are not logged in as the administrator, do this directly
         return server.create_user("users", name + "@example.com", name + " " + name, name)
 
-    # FIXME - servers should not have uuid set to name, but maybe for testing it doesn't
-    # matter.
-    def create_server(self, name):
-        return server.create_appliance(name, name)
+    # Servers should not normally have uuid set to name, but maybe for testing it doesn't
+    # matter?
+    def create_server(self, name, owner):
+        owner_id = server.get_user_id_from_name(owner)
+        server_id = server.create_appliance(name, name)
 
+        server.touch_to_add_ownership(server_id, owner_id)
+
+        return server_id
+
+    def add_credit(self, amount, owner):
+        owner_id = server.get_user_id_from_name(owner)
+
+        server.touch_to_add_credit(owner_id, int(amount))
 
 if __name__ == '__main__':
     unittest.main()

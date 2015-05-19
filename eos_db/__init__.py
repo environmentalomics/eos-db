@@ -199,10 +199,9 @@ def main(global_config, **settings):
 
     config.add_route('users',       '/users')         # Return user list
 
-    config.add_route('my_user',     '/user')          # Return info about me
+    config.add_route('my_user',     '/user')          # Return info about me (including credit)
     config.add_route('my_password', '/user/password') # Set my password
     config.add_route('my_touches',  '/user/touches')  # Get server touches
-    config.add_route('my_credit',   '/user/credit')   # Get (but not set!) my credit
 
     # User-related API calls (callable by Actors/Admins)
     config.add_route('user',  '/users/{name}')   # Get user details or

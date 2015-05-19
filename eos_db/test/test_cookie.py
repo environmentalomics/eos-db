@@ -68,9 +68,9 @@ class TestCookie(unittest.TestCase):
         r = self.app.get("/users/testuser", status=401)
         self.assertEqual(r.headers.get('Set-Cookie', 'empty'), 'empty')
 
-    """Confirm cookie returned upon authentication."""
-    def test_valid_username(self):
-        """ The DB API should return a cookie if I submit a correct username
+    def test_valid_cookie(self):
+        """Confirm cookie returned upon authentication.
+        The DB API should return a cookie if I submit a correct username
         and password. The cookie should allow me to make a successful request
         using it alone. """
 
@@ -111,6 +111,44 @@ class TestCookie(unittest.TestCase):
         self.app.authorization = None            # remove auth credentials
         self.app.set_cookie("auth_tkt", cookie)  # set cookie to bad value
         r = self.app.get("/users/testuser", status=401, expect_errors=False)
+
+    def test_valid_authtkt(self):
+        """Setting a cookie in the request is problematic for AJAX, so
+           test that we can feed the token back in the auth_tkt header instead.
+        """
+
+        self.app.authorization = ('Basic', ('testuser', 'testpass'))
+        r = self.app.get("/users/testuser", status=200)
+        cookie = self.app.cookies['auth_tkt']
+
+        self.app.reset()                         # clear cookie cache
+        self.app.authorization = None            # remove auth credentials
+
+        r = self.app.get("/users/testuser",
+                         headers={'auth_tkt': cookie},
+                         status=200)
+
+        #Furthermore, we should still get the same cookie on the second call
+        self.assertEqual(self.app.cookies['auth_tkt'], cookie)
+
+    def test_broken_cookie(self):
+        """ The DB API should refuse to service a request with a broken auth_tkt.
+            And should return a 408 error (I think - we don't want a 401 as it causes the
+            browser to prompt for a username/password which will then be remembered for
+            basic auth)
+        """
+
+        self.app.authorization = ('Basic', ('testuser', 'testpass'))
+        r = self.app.get("/users/testuser", status=200)
+        cookie = 'I am a fish'
+
+        self.app.reset()                         # clear cookie cache
+        self.app.authorization = None            # remove auth credentials
+
+        r = self.app.get("/users/testuser",
+                         headers={'auth_tkt': cookie},
+                         status=408,
+                         expect_errors=False)
 
 if __name__ == '__main__':
     unittest.main()

@@ -156,7 +156,9 @@ def retrieve_user(request):
     username = request.matchdict['name']
     try:
         actor_id = server.get_user_id_from_name(username)
-        return server.check_user_details(actor_id)
+        details = server.check_user_details(actor_id)
+        details.update({'credits' : server.check_credit(actor_id)})
+        return details
     except KeyError:
         return HTTPNotFound()
 
@@ -170,7 +172,9 @@ def retrieve_my_user(request):
     username = request.authenticated_userid
     try:
         actor_id = server.get_user_id_from_name(username)
-        return server.check_user_details(actor_id)
+        details = server.check_user_details(actor_id)
+        details.update({'credits' : server.check_credit(actor_id)})
+        return details
     except KeyError:
         #Should be impossible unless a logged-in user is deleted.
         return HTTPInternalServerError()
@@ -186,7 +190,7 @@ def delete_user(request):
     # FIXME: Not implemented. Some thought needs to go into this. I think a
     # deletion flag would be appropriate, but this will involve changing quite
     # a number of queries.
-    # Tim thiks - makbe just lock the password and remove all machines/credit?
+    # Tim thinks - makbe just lock the password and remove all machines?
     response = HTTPNotImplemented()
     return response
 
@@ -252,6 +256,24 @@ def create_user_credit(request):
     except KeyError:
         return HTTPNotFound()
 
+# Not sure if Ben was in the process of folding credit balance into user details
+# or splitting it out.  I vote for folding it in.
+# DELETEME
+# 
+# @view_config(request_method="GET", route_name='my_credit', renderer='json', permission="use")
+# def retrieve_my_credit(request):
+#     """Return credits outstanding for current user.
+# 
+#     :returns: JSON containing actor_id and current balance.
+#     """
+#     username = request.authenticated_userid
+#     actor_id = server.get_user_id_from_name(username)
+#     # actor_id should be valid
+#     credits = server.check_credit(actor_id)
+#     return  { 'actor_id': actor_id,
+#               'credit_balance': int(credits)}
+
+# FIXME - should just return credit to match the POST above.
 @view_config(request_method="GET", route_name='user_credit', renderer='json', permission="act")
 def retrieve_user_credit(request):
     """Return credits outstanding for any user.
@@ -268,18 +290,6 @@ def retrieve_user_credit(request):
     except KeyError as e:
         return HTTPNotFound(str(e))
 
-@view_config(request_method="GET", route_name='my_credit', renderer='json', permission="use")
-def retrieve_my_credit(request):
-    """Return credits outstanding for current user.
-
-    :returns: JSON containing actor_id and current balance.
-    """
-    username = request.authenticated_userid
-    actor_id = server.get_user_id_from_name(username)
-    # actor_id should be valid
-    credits = server.check_credit(actor_id)
-    return  { 'actor_id': actor_id,
-              'credit_balance': int(credits)}
 
 @view_config(request_method="GET", route_name='servers', renderer='json', permission="use")
 def retrieve_servers(request):
@@ -287,7 +297,8 @@ def retrieve_servers(request):
     Lists all artifacts related to the current user.
     """
     #print ("Servers for user: " + request.authenticated_userid)
-    server_list = server.list_artifacts_for_user(request.authenticated_userid)
+    user_id = server.get_user_id_from_name(request.authenticated_userid)
+    server_list = server.list_artifacts_for_user(user_id)
     #print (server_list)
     return server_list
 
