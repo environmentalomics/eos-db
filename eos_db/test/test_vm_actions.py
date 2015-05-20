@@ -131,6 +131,23 @@ class TestVMActions(unittest.TestCase):
         returned_id = s.get_server_id_from_name("getname")
         self.assertEqual(artifact_id, returned_id)
 
+    def test_get_server_id_from_dupe(self):
+        """I'm not sure what the original thinking was, but the schema
+           allows me to create 2 servers with the same name, in which case
+           I want the newest one back when I search.
+        """
+        artifact1 = self.my_create_appliance("dupe")
+        self.assertEqual(s.get_server_id_from_name("dupe"), artifact1)
+
+        #In an earlier bug an arbitrary server was returned.  Hard to
+        #test reliably for this situation.
+        artifact2 = self.my_create_appliance("dupe")
+        self.assertNotEqual(artifact2, artifact1)
+        self.assertEqual(s.get_server_id_from_name("dupe"), artifact2)
+
+        artifact3 = self.my_create_appliance("dupe")
+        self.assertEqual(s.get_server_id_from_name("dupe"), artifact3)
+
     def test_get_server_id_from_uuid(self):
         artifact_id = self.my_create_appliance("getuuid")
         server_details = s.return_artifact_details(artifact_id)

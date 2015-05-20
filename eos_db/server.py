@@ -5,13 +5,15 @@ Cloudhands database, request information from the DB, or bundle a series of
 functions which cause a number of DB changes to take effect.
 """
 
-from eos_db.models import Artifact, Appliance, Registration
-from eos_db.models import Membership, GroupMembership
-from eos_db.models import Actor, Component, User, Ownership
-from eos_db.models import Touch
-from eos_db.models import State, ArtifactState, Deboost, SessionKey
-from eos_db.models import Resource, Node, Password, Credit, Specification
-from eos_db.models import Base
+from collections import OrderedDict
+
+#We need everything from the models
+from eos_db.models import ( Artifact, Appliance, Registration,
+                            Membership, GroupMembership,
+                            Actor, Component, User, Ownership,
+                            Touch, State, ArtifactState, Deboost,
+                            Resource, Node, Password, Credit,
+                            Specification, Base )
 
 # Load config.
 DB = None
@@ -233,14 +235,27 @@ def list_artifacts_for_user(user_id):
     :param user_id: A valid user id for which we want to list details.
     :returns: List of dictionaries containing pertinent info.
     """
-    artifacts = []
-    for (artifact_id,
-         artifact_uuid,
-         artifact_name) in _list_artifacts_for_user(user_id):
-        artifacts.append(return_artifact_details(artifact_id,
-                                                 artifact_name,
-                                                 artifact_uuid))
-    return artifacts
+    # This bit was  _list_artifacts_for_user(user_id)
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+    session = Session()
+    servers = (session
+               .query(Artifact.id, Artifact.name, Artifact.uuid)
+               .filter(Artifact.id == Touch.artifact_id)
+               .filter(Touch.id == Ownership.touch_id)
+               .filter(Ownership.user_id == Actor.id)
+               .filter(Actor.id == user_id)
+               .distinct(Artifact.id)
+               .all())
+    session.close()
+
+    #OrderedDict gives me the property of updating an server listed
+    #twice while stll maintaining database order.
+    artifacts = OrderedDict()
+    for server in servers:
+        if server[1] in artifacts:
+            del artifacts[server[1]]
+        artifacts[server[1]] = return_artifact_details(*server)
+    return artifacts.values()
 
 def return_artifact_details(artifact_id, artifact_name="", artifact_uuid=""):
     """ Return basic information about each server. """
@@ -261,13 +276,16 @@ def return_artifact_details(artifact_id, artifact_name="", artifact_uuid=""):
         cores, ram = "N/A", "N/A"
     if state == None:
         state = "Not yet initialised"
-    if artifact_uuid == "":
+    if not artifact_uuid:
         artifact_uuid = get_server_uuid_from_id(artifact_id)
-    if artifact_name == "":
+    if not artifact_name:
         artifact_name = get_server_name_from_id(artifact_id)
+
+    #For some reason uuid and name have been declared as CHAR in the DB
+    #and so they come out space-padded on PostgreSQL.  Strip them here.
     return({"artifact_id": artifact_id,
-            "artifact_uuid": artifact_uuid,
-            "artifact_name": artifact_name,
+            "artifact_uuid": artifact_uuid.rstrip(),
+            "artifact_name": artifact_name.rstrip(),
             "change_dt": str(change_dt[0])[0:16],
             "create_dt": str(create_dt[0])[0:16],
             "state": state,
@@ -287,6 +305,11 @@ def set_deboost(hours, touch_id):
 
     return _create_thingy(new_deboost)
 
+#FIXME - rationalise these to three functions:
+#  get_server_by_name
+#  get_sever_by_id
+#  get_server_by_uuid
+# That all return the same info as return_artifact_details(id)
 def get_server_name_from_id(artifact_id):
     """ Get the name field from an artifact.
 
@@ -315,12 +338,13 @@ def get_server_id_from_name(name):
     artifact_id = (session
                    .query(Artifact.id)
                    .filter(Artifact.name == name)
+                   .order_by(Artifact.id.desc())
                    .first())
     session.close()
     return artifact_id[0]
 
 def get_server_id_from_uuid(uuid):
-    """ Get the system ID of a server from its name.
+    """ Get the system ID of a server from its UUID.
 
     :param name: The name of an artifact.
     :returns: Internal ID of artifact.
@@ -728,25 +752,6 @@ def check_state(artifact_id):
     return the most recent state. """
     #FIXME - this function is pointless and should be factored out.
     return _get_most_recent_artifact_state(artifact_id)
-
-def _list_artifacts_for_user(user_id):
-    """Generates a list of artifacts associated with the user_id.
-
-    :param user_id: A valid user id.
-    :returns: List of tuples as (artifact_id, artifact_name)
-    """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    servers = (session
-               .query(Artifact.id, Artifact.uuid, Artifact.name)
-               .filter(Artifact.id == Touch.artifact_id)
-               .filter(Touch.id == Ownership.touch_id)
-               .filter(Ownership.user_id == Actor.id)
-               .filter(Actor.id == user_id)
-               .distinct(Artifact.id)
-               .all())
-    session.close()
-    return servers
 
 def _get_most_recent_change(artifact_id):
     """Returns the date on which an artifact was most recently changed.

@@ -88,15 +88,14 @@ def home_view(request):
 @view_config(request_method="OPTIONS", route_name='servers')
 def options(request):
     """ Return the OPTIONS header. """
-    # FIXME: This is important for enabling CORS, although under certain
+    # NOTE: This is important for enabling CORS, although under certain
     # circumstances the browser doesn' appear to need it. Might be worth
     # examining why.
-    # FIXME2: I suspect this was never needed but might as well make it pass
-    # the tests for now.
     resp = Response(None)
     resp.headers['Allow'] = "HEAD,GET,OPTIONS"
     return resp
 
+@view_config(request_method="OPTIONS", route_name='server')
 @view_config(request_method="OPTIONS", route_name='server_specification')
 def options2(request):
     resp = Response(None)
@@ -300,7 +299,7 @@ def retrieve_servers(request):
     user_id = server.get_user_id_from_name(request.authenticated_userid)
     server_list = server.list_artifacts_for_user(user_id)
     #print (server_list)
-    return server_list
+    return list(server_list)
 
 @view_config(request_method="GET", route_name='state', renderer='json', permission="use")
 def retrieve_servers_in_state(request):
@@ -352,6 +351,8 @@ def update_server(request):
 def delete_server(request):
     # FIXME: Not implemented. Again, this needs thought. Probably logical
     # deletion through a "deleted" flag.
+    # Or else, add a new server with the same name and blank UUID, as currently for multiple
+    # servers with the same name we only see the last.
     response = HTTPNotImplemented()
     return response
 
