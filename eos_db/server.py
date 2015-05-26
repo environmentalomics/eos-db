@@ -50,7 +50,7 @@ def with_session(f):
         #variable is never set and therefore is left for the caller to close.
         session = None
         if not kwargs.get('session'):
-            Session = sessionmaker(bind=engine, expire_on_commit=True)
+            Session = sessionmaker(bind=engine, expire_on_commit=False)
             session = Session()
             kwargs['session'] = session
         res = None
@@ -59,7 +59,9 @@ def with_session(f):
         except Exception as e:
             if session: session.close()
             raise e
-        if session: session.commit()
+        if session:
+            session.commit()
+            session.close()
         return res
     return inner
 
@@ -96,7 +98,7 @@ def choose_engine(enginestring, replace=True):
             engine = create_engine('postgresql:///eos_db', echo=False)
 
     elif enginestring == "SQLite":
-        engine = create_engine('sqlite://', echo=True)
+        engine = create_engine('sqlite://', echo=False)
 
     else:
         raise LookupError("Invalid server type.")
@@ -145,7 +147,8 @@ def setup_states():
     for state in get_state_list():
             create_artifact_state(state)
 
-def list_user_ids():
+@with_session
+def list_user_ids(session):
     """Lists all active user IDs
     """
     #Note that, like for servers, if a new user is created with the same name it
@@ -217,6 +220,8 @@ def _create_thingy(sql_entity, session):
        that aids legibility.  Maybe should rename this though.
     """
     session.add(sql_entity)
+    #Note that this commit causes the .id to be populated.
+    session.commit()
     return sql_entity.id
 
 
@@ -261,8 +266,6 @@ def list_artifacts_for_user(user_id, session):
 
 @with_session
 def return_artifact_details(artifact_id, artifact_name="", artifact_uuid="", session=None):
-
-    print("DEBUG1 -- session=" + session)
 
     """ Return basic information about each server. """
     change_dt = _get_most_recent_change(artifact_id, session=session)
@@ -566,7 +569,6 @@ def touch_to_add_specification(vm_id, cores, ram):
 
 @with_session
 def get_latest_specification(vm_id, session):
-    print("DEBUG2 -- session=" + str(session))
     """ Return the most recent / current state of a VM.
 
     :param vm_id: A valid VM id.
@@ -713,7 +715,7 @@ def check_credit(actor_id, session):
     return credit or 0
 
 @with_session
-def check_actor_id(actor_id):
+def check_actor_id(actor_id, session):
     """Checks to ensure an actor exists.
 
     :param actor_id: The actor id which we are checking.
@@ -731,10 +733,7 @@ def check_user_details(user_id, session):
     :param user_id: The actor id which we are checking.
     :returns: Dictionary containing user details
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
     our_user = session.query(User).filter_by(id=user_id).first()
-    session.close()
     #TODO - add user group
     return {'id':our_user.id,
             'handle':our_user.handle,

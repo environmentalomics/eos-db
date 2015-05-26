@@ -137,7 +137,7 @@ def retrieve_users(request):
     """
     res = []
     for user_id in server.list_user_ids():
-        res.append(server.check_user_details(actor_id))
+        res.append(server.check_user_details(user_id))
 
     return res
 
