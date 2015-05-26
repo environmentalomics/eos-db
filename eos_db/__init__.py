@@ -203,7 +203,7 @@ def main(global_config, **settings):
     config.add_route('users',       '/users')         # Return user list
 
     config.add_route('my_user',     '/user')          # Return info about me (including credit)
-    config.add_route('my_password', '/user/password') # Set my password
+    config.add_route('my_password', '/user/password') # Set my password (only for admins or self)
     config.add_route('my_touches',  '/user/touches')  # Get server touches
 
     # User-related API calls (callable by Actors/Admins)

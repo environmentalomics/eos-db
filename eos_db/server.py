@@ -15,6 +15,14 @@ from eos_db.models import ( Artifact, Appliance, Registration,
                             Resource, Node, Password, Credit,
                             Specification, Base )
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import func
+from datetime import datetime, timedelta
+
+engine = None  # Assume no default database connection
+
+
 # Load config.
 DB = None
 try:
@@ -31,17 +39,17 @@ try:
 except:
     pass
 
-# FIXME - fix and then use this thing!!
 def with_session(f):
     """Decorator that automatically passes a Session to a function and then shuts
-       the session down at the end, unless a session was already passed thorugh.
-       The decorator takes no arguments.
+       the session down at the end, unless a session was already passed through.
+       The decorator itself takes no arguments.  The function must have a session
+       argument.
     """
     def inner(*args, **kwargs):
         #Note that if session is passed in kwargs the local session
         #variable is never set and therefore is left for the caller to close.
         session = None
-        if not session in kwargs:
+        if not kwargs.get('session'):
             Session = sessionmaker(bind=engine, expire_on_commit=True)
             session = Session()
             kwargs['session'] = session
@@ -55,13 +63,6 @@ def with_session(f):
         return res
     return inner
 
-
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.sql import func
-from datetime import datetime, timedelta
-
-engine = ""  # Assume no default database connection
 
 def choose_engine(enginestring, replace=True):
     """
@@ -95,7 +96,7 @@ def choose_engine(enginestring, replace=True):
             engine = create_engine('postgresql:///eos_db', echo=False)
 
     elif enginestring == "SQLite":
-        engine = create_engine('sqlite://', echo=False)
+        engine = create_engine('sqlite://', echo=True)
 
     else:
         raise LookupError("Invalid server type.")
@@ -144,6 +145,14 @@ def setup_states():
     for state in get_state_list():
             create_artifact_state(state)
 
+def list_user_ids():
+    """Lists all active user IDs
+    """
+    #Note that, like for servers, if a new user is created with the same name it
+    #overwrites the previous record, so I need to do it like this:
+    for n in session.query(User.username).distinct():
+        yield get_user_id_from_name(n[0])
+
 def create_user(type, handle, name, username):
     """Create a new user record. Handle/uuid must be unique e-mail address"""
     Base.metadata.create_all(engine)
@@ -173,19 +182,17 @@ def create_group_membership(touch_id, group):
     # FIXME (Tim) - touch_id was unused, so clearly this was broken.  Test as-is first.
     return _create_thingy(GroupMembership(group=group, touch_id=touch_id))
 
-def get_user_group(username):
+@with_session
+def get_user_group(username, session):
     """ Get the group associated with a given username. """
     if username is not None:
-        actor_id = get_user_id_from_name(username)
-        Session = sessionmaker(bind=engine, expire_on_commit=False)
-        session = Session()
+        actor_id = get_user_id_from_name(username, session=session)
         group = (session
                  .query(GroupMembership.group)
                  .filter(GroupMembership.touch_id == Touch.id)
                  .filter(Touch.actor_id == actor_id)
                  .order_by(Touch.touch_dt.desc())
                  .first())
-        session.close()
         #print("get_user_group: User %s is in group %s" % (username, group[0]))
         return group[0]
     else:
@@ -203,16 +210,13 @@ def create_artifact_state(state_name):
     relevant docs in the model. """
     return _create_thingy(ArtifactState(name=state_name))
 
-def _create_thingy(sql_entity):
+@with_session
+def _create_thingy(sql_entity, session):
     """Internal call that holds the boilerplate for putting a new SQLAlchemy object
        into the database.  BC suggested this should be a decorator but I don't think
-       that aids legibility.
+       that aids legibility.  Maybe should rename this though.
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
     session.add(sql_entity)
-    session.commit()
-    session.close()
     return sql_entity.id
 
 
@@ -228,7 +232,8 @@ def create_node():
     """
     pass  # FIXME: See above for comments related to Vapps and VMs.
 
-def list_artifacts_for_user(user_id):
+@with_session
+def list_artifacts_for_user(user_id, session):
     """Returns a list of dictionaries listing pertinent information about
     user's artifacts.
 
@@ -236,8 +241,6 @@ def list_artifacts_for_user(user_id):
     :returns: List of dictionaries containing pertinent info.
     """
     # This bit was  _list_artifacts_for_user(user_id)
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
     servers = (session
                .query(Artifact.id, Artifact.name, Artifact.uuid)
                .filter(Artifact.id == Touch.artifact_id)
@@ -246,40 +249,43 @@ def list_artifacts_for_user(user_id):
                .filter(Actor.id == user_id)
                .distinct(Artifact.id)
                .all())
-    session.close()
 
-    #OrderedDict gives me the property of updating an server listed
-    #twice while stll maintaining database order.
+    #OrderedDict gives me the property of updating any server listed
+    #twice while still maintaining database order.
     artifacts = OrderedDict()
     for server in servers:
         if server[1] in artifacts:
             del artifacts[server[1]]
-        artifacts[server[1]] = return_artifact_details(*server)
+        artifacts[server[1]] = return_artifact_details(*server, session=session)
     return artifacts.values()
 
-def return_artifact_details(artifact_id, artifact_name="", artifact_uuid=""):
+@with_session
+def return_artifact_details(artifact_id, artifact_name="", artifact_uuid="", session=None):
+
+    print("DEBUG1 -- session=" + session)
+
     """ Return basic information about each server. """
-    change_dt = _get_most_recent_change(artifact_id)
-    create_dt = _get_artifact_creation_date(artifact_id)
-    state = check_state(artifact_id)
+    change_dt = _get_most_recent_change(artifact_id, session=session)
+    create_dt = _get_artifact_creation_date(artifact_id, session=session)
+    state = check_state(artifact_id, session=session)
     boosted = _get_server_boost_status(artifact_id)
     try:
-        boostremaining = get_hours_until_deboost(artifact_id)
+        boostremaining = get_hours_until_deboost(artifact_id, session=session)
         if boostremaining < 0:
             boostremaining = "N/A"
     except:
         boostremaining = "N/A"
     try:
-        cores, ram = get_latest_specification(artifact_id)
+        cores, ram = get_latest_specification(artifact_id, session=session)
         ram = str(ram) + " GB"
     except:
         cores, ram = "N/A", "N/A"
     if state == None:
         state = "Not yet initialised"
     if not artifact_uuid:
-        artifact_uuid = get_server_uuid_from_id(artifact_id)
+        artifact_uuid = get_server_uuid_from_id(artifact_id, session=session)
     if not artifact_name:
-        artifact_name = get_server_name_from_id(artifact_id)
+        artifact_name = get_server_name_from_id(artifact_id, session=session)
 
     #For some reason uuid and name have been declared as CHAR in the DB
     #and so they come out space-padded on PostgreSQL.  Strip them here.
@@ -310,22 +316,21 @@ def set_deboost(hours, touch_id):
 #  get_sever_by_id
 #  get_server_by_uuid
 # That all return the same info as return_artifact_details(id)
-def get_server_name_from_id(artifact_id):
+@with_session
+def get_server_name_from_id(artifact_id, session):
     """ Get the name field from an artifact.
 
     :param artifact_id: A valid artifact id.
     :returns: name of artifact.
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
     artifact_name = (session
                      .query(Artifact.name)
                      .filter(Artifact.id == artifact_id)
                      .first())
-    session.close()
     return artifact_name[0]
 
-def get_server_id_from_name(name):
+@with_session
+def get_server_id_from_name(name, session):
     """ Get the system ID of a server from its name.
 
     :param name: The name of an artifact.
@@ -333,32 +338,28 @@ def get_server_id_from_name(name):
     """
     # FIXME - Check behaviour on duplicate names. This should not be a problem
     # due to database constraints, but is worth looking at, just in case.
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
     artifact_id = (session
                    .query(Artifact.id)
                    .filter(Artifact.name == name)
                    .order_by(Artifact.id.desc())
                    .first())
-    session.close()
     return artifact_id[0]
 
-def get_server_id_from_uuid(uuid):
+@with_session
+def get_server_id_from_uuid(uuid, session):
     """ Get the system ID of a server from its UUID.
 
     :param name: The name of an artifact.
     :returns: Internal ID of artifact.
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
     artifact_id = (session
                    .query(Artifact.id)
                    .filter(Artifact.uuid == uuid)
                    .first())
-    session.close()
     return artifact_id[0]
 
-def get_user_id_from_name(name):
+@with_session
+def get_user_id_from_name(name, session):
     """ Get the system ID of a user from his name.
 
     :param name: The username of a user.
@@ -366,13 +367,10 @@ def get_user_id_from_name(name):
     """
     # FIXME - Behaviour with duplicates also applies here. Ensure constraints
     # properly set.
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
     user_id = (session
                .query(User.id)
                .filter(User.username == name)
                .first())
-    session.close()
     if not user_id:
         raise KeyError("No such user")
     return user_id[0]
@@ -398,16 +396,15 @@ def _get_server_boost_status(artifact_id):
     else:
         return "Unboosted"
 
+@with_session
 def get_deboost_credits(artifact_id):
     """ Get the number of credits which should be refunded upon deboost.
 
     :param artifact_id: The artifact in question by ID.
     :returns: Number of credits to be refunded..
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    hours = get_hours_until_deboost(artifact_id)
-    cores, ram = get_latest_specification(artifact_id)
+    hours = get_hours_until_deboost(artifact_id, session=session)
+    cores, ram = get_latest_specification(artifact_id, session=session)
     multiplier = 0
     if ram == 40:
         multiplier = 1
@@ -417,10 +414,10 @@ def get_deboost_credits(artifact_id):
         multiplier = 12
     return multiplier * hours
 
-    session.close()
     return deboost_credits
 
-def list_servers_by_state():
+@with_session
+def list_servers_by_state(session):
     """ Iterates through servers and bins them by state.  In a more
         standard database layout we could do this with a single SQL
         query.
@@ -428,8 +425,6 @@ def list_servers_by_state():
     :param state: A string containing the name of a state.
     :returns: Artifact ID.
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
     servers = session.query(Artifact.name).distinct()
     state_table = {}
     for server_name in servers:
@@ -445,7 +440,6 @@ def list_servers_by_state():
             state_table[s_state].append(server_id)
         else:
             state_table[s_state] = [ server_id ]
-    session.close()
     return state_table
 
 def touch_to_add_ownership(artifact_id, user_id):
@@ -461,27 +455,24 @@ def touch_to_add_ownership(artifact_id, user_id):
     ownership_id = create_ownership(touch_id, user_id)
     return ownership_id
 
-def get_server_uuid_from_id(id):
+@with_session
+def get_server_uuid_from_id(id, session):
     """ Get the uuid field from an artifact.
 
     :param artifact_id: A valid artifact id.
     :returns: uuid of artifact.
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
     server = session.query(Artifact.uuid).filter(Artifact.id == id).first()
-    session.close()
     return server[0]
 
-def check_ownership(artifact_id, actor_id):
+@with_session
+def check_ownership(artifact_id, actor_id, session):
     """ Check if an artifact belongs to a given user.
 
     :param artifact_id: A valid artifact id.
     :param actor_id: A valid actor (user) id.
     :returns: boolean to indicate ownership.
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
     our_ownership = (session
                      .query(Ownership)
                      .filter(Ownership.user_id == actor_id)
@@ -489,26 +480,22 @@ def check_ownership(artifact_id, actor_id):
                      .filter(Touch.artifact_id == artifact_id)
                      .order_by(Touch.id.desc())
                      .first())
-    session.close()
     if our_ownership is None:
         return False
     else:
         return True
 
-
-def get_state_id_by_name(name):
+@with_session
+def get_state_id_by_name(name, session):
     """Gets the id of a state from the name associated with it.
 
     :param name: A printable state name, as passed to setup_states
     :returns: The corresponding internal state_id
     :raises: IndexError if there is no such state
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
     state_id = (session.query(State.id)
                 .filter(State.name == name)
                 .first())[0]
-    session.close()
     return state_id
 
 def touch_to_state(actor_id, artifact_id, state_name):
@@ -577,36 +564,37 @@ def touch_to_add_specification(vm_id, cores, ram):
     success = _create_specification(touch_id, cores, ram)
     return success
 
-def get_latest_specification(vm_id):
+@with_session
+def get_latest_specification(vm_id, session):
+    print("DEBUG2 -- session=" + str(session))
     """ Return the most recent / current state of a VM.
 
     :param vm_id: A valid VM id.
     :returns: String containing current status.
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    state = session.query(Specification.cores, Specification.ram). \
-        filter(Specification.touch_id == Touch.id). \
-        filter(Touch.artifact_id == vm_id). \
-        filter(Touch.touch_dt != None). \
-        order_by(Touch.touch_dt.desc()).first()
-    session.close()
+    state = ( session
+              .query(Specification.cores, Specification.ram)
+              .filter(Specification.touch_id == Touch.id)
+              .filter(Touch.artifact_id == vm_id)
+              .filter(Touch.touch_dt != None)
+              .order_by(Touch.touch_dt.desc())
+              .first() )
     return state
 
-def get_latest_deboost_dt(vm_id):
+@with_session
+def get_latest_deboost_dt(vm_id, session):
     """ Return the most recent / current deboost date of a VM.
 
     :param vm_id: A valid VM id.
     :returns: String containing most recent deboost date.
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    state = session.query(Deboost.deboost_dt). \
-        filter(Deboost.touch_id == Touch.id). \
-        filter(Touch.artifact_id == vm_id). \
-        filter(Touch.touch_dt != None). \
-        order_by(Touch.touch_dt.desc()).first()
-    session.close()
+    state = ( session
+              .query(Deboost.deboost_dt)
+              .filter(Deboost.touch_id == Touch.id)
+              .filter(Touch.artifact_id == vm_id)
+              .filter(Touch.touch_dt != None)
+              .order_by(Touch.touch_dt.desc())
+              .first() )
     return state
 
 def get_hours_until_deboost(vm_id):
@@ -616,18 +604,18 @@ def get_hours_until_deboost(vm_id):
     d = deboost_dt - now
     return int(d.total_seconds() / 3600)
 
-def get_previous_specification(vm_id, index):
+@with_session
+def get_previous_specification(vm_id, index, session):
     """
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    state = session.query(Specification.cores, Specification.ram). \
-        filter(Specification.touch_id == Touch.id). \
-        filter(Touch.artifact_id == vm_id). \
-        filter(Touch.touch_dt != None). \
-        order_by(Touch.touch_dt.desc()).all()[1]
-    session.close()
-    return state
+    state = ( session
+              .query(Specification.cores, Specification.ram)
+              .filter(Specification.touch_id == Touch.id)
+              .filter(Touch.artifact_id == vm_id)
+              .filter(Touch.touch_dt != None)
+              .order_by(Touch.touch_dt.desc())
+              .all() )
+    return state[1]
 
 
 def touch_to_add_node():
@@ -670,11 +658,10 @@ def create_ownership(touch_id, user_id):
     new_ownership = Ownership(touch_id=touch_id, user_id=user_id)
     return _create_thingy(new_ownership)
 
-def check_password(username, password):
+@with_session
+def check_password(username, password, session):
     """ Returns a Boolean to describe whether the username and password
     combination is valid. """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
     our_password = (session
                     .query(Password)
                     .filter(Password.touch_id == Touch.id)
@@ -682,7 +669,6 @@ def check_password(username, password):
                     .filter(User.username == username)
                     .order_by(Touch.id.desc())
                     .first())
-    session.close()
     if our_password is None:
         #print ("No password for user")
         return False
@@ -709,8 +695,8 @@ def _create_specification(touch_id, cores, ram):
     """
     return _create_thingy(Specification(touch_id=touch_id, cores=cores, ram=ram))
 
-
-def check_credit(actor_id):
+@with_session
+def check_credit(actor_id, session):
     """Returns the credit currently available to the given actor / user.
 
     :param actor_id: The system id of the user or actor for whom we are \
@@ -718,30 +704,28 @@ def check_credit(actor_id):
     :returns: Current credit balance.  If there is no credit record for the \
               user will return zero.
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
     credit = (session
               .query(func.sum(Credit.credit))
               .filter(Credit.touch_id == Touch.id)
               .filter(Touch.actor_id == Actor.id)
               .filter(Actor.id == actor_id)
               .scalar())
-    session.close()
     return credit or 0
 
+@with_session
 def check_actor_id(actor_id):
     """Checks to ensure an actor exists.
 
     :param actor_id: The actor id which we are checking.
-    :returns: True (1) or False (0)
+    :returns: True or False
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    res = session.query(Actor).filter(Actor.id == actor_id).count()
-    session.close()
-    return res
+    return ( session
+             .query(Actor)
+             .filter(Actor.id == actor_id)
+             .count() )
 
-def check_user_details(user_id):
+@with_session
+def check_user_details(user_id, session):
     """Generates a list of account details for an actor.
 
     :param user_id: The actor id which we are checking.
@@ -758,15 +742,14 @@ def check_user_details(user_id):
             'name': our_user.name
             }
 
-def check_state(artifact_id):
+@with_session
+def check_state(artifact_id, session):
     """Returns the current state of an artifact, or None if no state
        has been set.
 
     :param artifact_id: A valid artifact id.
     :returns: current state of artifact (str)
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
     state = (session
              .query(ArtifactState.name)
              .filter(Touch.artifact_id == artifact_id)
@@ -774,35 +757,30 @@ def check_state(artifact_id):
              .filter(Touch.touch_dt != None)
              .order_by(Touch.touch_dt.desc())
              .first())
-    session.close()
     return state[0] if state else None
 
-def _get_most_recent_change(artifact_id):
+@with_session
+def _get_most_recent_change(artifact_id, session):
     """Returns the date on which an artifact was most recently changed.
 
     :param artifact_id: A valid artifact id.
     :returns: datetime of most recent change (str)
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
     change_dt = (session
                  .query(func.max(Touch.touch_dt))
                  .filter(Touch.artifact_id == artifact_id)
                  .first())
-    session.close()
     return change_dt
 
-def _get_artifact_creation_date(artifact_id):
+@with_session
+def _get_artifact_creation_date(artifact_id, session):
     """Returns the data of the first touch recorded against an artifact.
 
     :param artifact_id: A valid artifact id.
     :returns: timestamp of first touch (str)
     """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
     change_dt = (session
                  .query(func.min(Touch.touch_dt))
                  .filter(Touch.artifact_id == artifact_id)
                  .first())
-    session.close()
     return change_dt

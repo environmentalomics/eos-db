@@ -97,8 +97,6 @@ class TestUserAPI(unittest.TestCase):
 
         self.assertEqual(self.app.get('/users/anotheruser').json['name'], "anotheruser anotheruser")
 
-    #FIXME - this should be supported.
-    @unittest.skip
     def test_retrieve_users(self):
         """ Add another couple of users. Three records should be returned, as
             there is already a testuser. """
@@ -106,14 +104,15 @@ class TestUserAPI(unittest.TestCase):
         self.create_user("foo")
         self.create_user("bar")
 
-        response = self.app.get('/users/')
+        response = self.app.get('/users')
 
         self.assertEqual(len(response.json), 3)
 
     #Unimplemented just now.
     @unittest.expectedFailure
     def test_delete_user(self):
-        """ Delete a user. Should fail because the account does not have permission.
+        """ Delete a user. Should fail because the account does not have permission,
+            but it actually fails because deletion is unimplemented.
         """
         self.create_user("anotheruser")
         response = self.app.delete('/users/anotheruser', status=404)

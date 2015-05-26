@@ -132,10 +132,15 @@ def setup_states(request):
 
 @view_config(request_method="GET", route_name='users', renderer='json', permission="use")
 def retrieve_users(request):
-    # FIXME: Do these need to be here? Or are they worth having as a placeholder?
-    # Tim says - yes I'd like to be able to return a list of users.  Not sure if it should
-    # be limited to admins.
-    return HTTPNotImplemented()
+    """Return details for all users on the system.  Basically the same as calling /users/x
+       for all users, but missing the credit info.
+    """
+    res = []
+    for user_id in server.list_user_ids():
+        res.append(server.check_user_details(actor_id))
+
+    return res
+
 
 @view_config(request_method="PUT", route_name='user', renderer='json', permission="use")
 def create_user(request):
