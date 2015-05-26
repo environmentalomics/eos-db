@@ -301,12 +301,30 @@ def retrieve_servers(request):
     #print (server_list)
     return list(server_list)
 
+@view_config(request_method="GET", route_name='states', renderer='json', permission="use")
+def retrieve_server_counts_by_state(request):
+    """
+    List all states and the number of servers in that state.
+    """
+    #Note that with the current DB schema, having the separate state and states calls is silly
+    #because both retrieve the same info from the DB then selectively throw bits away.
+    server_table = server.list_servers_by_state()
+
+    all_states = server.get_state_list()
+
+    #Not so good - we'd like to report all valid states...
+    #return { k: len(v) for k, v in server_table }
+
+    #Better...
+    return { s: len(server_table.get(s, ())) for s in all_states }
+
+
 @view_config(request_method="GET", route_name='state', renderer='json', permission="use")
 def retrieve_servers_in_state(request):
     """
     Lists all servers in a given state.
     """
-    server_ids = server.list_servers_in_state(request.matchdict['name'])
+    server_ids = server.list_servers_by_state().get(request.matchdict['name'],())
     server_uuid = [ server.get_server_uuid_from_id(s_id) for s_id in server_ids ]
     server_name = [ server.get_server_name_from_id(s_id) for s_id in server_ids ]
     return [ { "artifact_id"   : s[0],

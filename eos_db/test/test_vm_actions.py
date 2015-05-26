@@ -6,17 +6,6 @@ This test suite avoids webtest and calls server functions directly.
 import unittest
 import eos_db.server as s
 
-# FIXME - use the list from server.py
-STATE_LIST = ["Starting",       # Machine was stopped, now starting up.
-              "Stopping",       # Machine was started, now stopping.
-              "Started",        # Machine is running.
-              "Stopped",        # Machine is stopped.
-              "Preparing",      # Stopping machine before a spec change.
-              "Boosting",       # Changing specs.
-              "Pre_Deboosting", # Preparing for deboost.
-              "Restarting",     # Restarting machine.
-              "Deboosting"]     # Changing specs.
-
 # These tests are not good.  Skip them for now.
 #@unittest.skip
 class TestVMActions(unittest.TestCase):
@@ -26,9 +15,6 @@ class TestVMActions(unittest.TestCase):
         s.choose_engine('SQLite')
         s.deploy_tables()
 
-#         for state in STATE_LIST:
-#             create_artifact_state(state)
-        #Surely:
         s.setup_states()
 
         # Not a real UUID!

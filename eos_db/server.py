@@ -261,7 +261,7 @@ def return_artifact_details(artifact_id, artifact_name="", artifact_uuid=""):
     """ Return basic information about each server. """
     change_dt = _get_most_recent_change(artifact_id)
     create_dt = _get_artifact_creation_date(artifact_id)
-    state = _get_most_recent_artifact_state(artifact_id)
+    state = check_state(artifact_id)
     boosted = _get_server_boost_status(artifact_id)
     try:
         boostremaining = get_hours_until_deboost(artifact_id)
@@ -420,22 +420,33 @@ def get_deboost_credits(artifact_id):
     session.close()
     return deboost_credits
 
-def list_servers_in_state(state):
-    """ Iterates through servers until it finds a server in the state
-    requested.
+def list_servers_by_state():
+    """ Iterates through servers and bins them by state.  In a more
+        standard database layout we could do this with a single SQL
+        query.
 
     :param state: A string containing the name of a state.
     :returns: Artifact ID.
     """
     Session = sessionmaker(bind=engine, expire_on_commit=False)
     session = Session()
-    servers = session.query(Artifact.id).all()
-    matching_servers = []
-    for server in servers:
-        if _get_most_recent_artifact_state(server[0]) == state:
-            matching_servers.append(server[0])
+    servers = session.query(Artifact.name).distinct()
+    state_table = {}
+    for server_name in servers:
+        #Remember that adding a duplicate named server overwrites the old one,
+        #so we can't just grab all the server IDs in the table.
+        server_id = get_server_id_from_name(server_name[0])
+
+        s_state = check_state(server_id)
+        if not s_state:
+            #Uninitialised
+            pass
+        elif s_state in state_table:
+            state_table[s_state].append(server_id)
+        else:
+            state_table[s_state] = [ server_id ]
     session.close()
-    return matching_servers
+    return state_table
 
 def touch_to_add_ownership(artifact_id, user_id):
     """ Adds an ownership resource to an artifact, effectively linking the VM
@@ -748,10 +759,23 @@ def check_user_details(user_id):
             }
 
 def check_state(artifact_id):
-    """ Return None is the artifact has no state assignned to it. Otherwise,
-    return the most recent state. """
-    #FIXME - this function is pointless and should be factored out.
-    return _get_most_recent_artifact_state(artifact_id)
+    """Returns the current state of an artifact, or None if no state
+       has been set.
+
+    :param artifact_id: A valid artifact id.
+    :returns: current state of artifact (str)
+    """
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+    session = Session()
+    state = (session
+             .query(ArtifactState.name)
+             .filter(Touch.artifact_id == artifact_id)
+             .filter(ArtifactState.id == Touch.state_id)
+             .filter(Touch.touch_dt != None)
+             .order_by(Touch.touch_dt.desc())
+             .first())
+    session.close()
+    return state[0] if state else None
 
 def _get_most_recent_change(artifact_id):
     """Returns the date on which an artifact was most recently changed.
@@ -782,21 +806,3 @@ def _get_artifact_creation_date(artifact_id):
                  .first())
     session.close()
     return change_dt
-
-def _get_most_recent_artifact_state(artifact_id):
-    """Returns the current state of an artifact.
-
-    :param artifact_id: A valid artifact id.
-    :returns: current state of artifact (str)
-    """
-    Session = sessionmaker(bind=engine, expire_on_commit=False)
-    session = Session()
-    state = (session
-             .query(ArtifactState.name)
-             .filter(Touch.artifact_id == artifact_id)
-             .filter(ArtifactState.id == Touch.state_id)
-             .filter(Touch.touch_dt != None)
-             .order_by(Touch.touch_dt.desc())
-             .first())
-    session.close()
-    return state[0] if state else None

@@ -190,11 +190,65 @@ class TestVMActionsHTTP(unittest.TestCase):
                  {"artifact_id":2, "artifact_uuid":"testserver2", "artifact_name":"testserver2"}]
                 )
 
+        #And after changing states around
+        self.create_server("testserver3")
+        app.post('/servers/testserver3/Stopping')
+        app.post('/servers/testserver2/Starting')
+        app.post('/servers/testserver3/Starting')
+        app.post('/servers/testserver2/Stopping')
+
+        self.assertEqual(res.json,
+                [{"artifact_id":1, "artifact_uuid":"testserver1", "artifact_name":"testserver1"},
+                 {"artifact_id":2, "artifact_uuid":"testserver2", "artifact_name":"testserver2"}]
+                )
+
     def test_retrieve_job_progress(self):
         """ Not currently implemented. """
 
     def test_retrieve_server_touches(self):
         """ Not currently implemented. """
+
+    def test_retrieve_by_state(self):
+        """ Test for /states
+        """
+        app = self.app
+        # Generate base status table
+        status_table = { s : 0 for s in server.get_state_list() }
+
+        r = app.get("/states")
+        self.assertEqual(r.json, status_table)
+
+        for n in range(1, 6):
+            self.create_server("testserver%i" % n)
+
+        app.post('/servers/testserver1/Stopping')
+        app.post('/servers/testserver2/Stopping')
+        app.post('/servers/testserver3/Stopping')
+        app.post('/servers/testserver4/Started')
+        app.post('/servers/testserver5/Starting')
+
+        # Test1 - servers set to only one state.
+        st1 = status_table.copy()
+        st1['Stopping'] = 3
+        st1['Started']  = 1
+        st1['Starting'] = 1
+
+        r = app.get("/states")
+        self.assertEqual(r.json, st1)
+
+        # Test2 - server states have been changed
+        app.post('/servers/testserver3/Started')
+        app.post('/servers/testserver3/Stopping')
+        app.post('/servers/testserver4/Stopping')
+        app.post('/servers/testserver3/Starting')
+
+        st2 = status_table.copy()
+        st2['Stopping'] = 3
+        st2['Started']  = 0
+        st2['Starting'] = 2
+
+        r = app.get("/states")
+        self.assertEqual(r.json, st2)
 
 ###############################################################################
 # Support Functions, calling server admin views                               #

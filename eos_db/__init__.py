@@ -231,20 +231,20 @@ def main(global_config, **settings):
                                                     # Post new server or
                                                     # Delete server
 
-    #FIXME - do I need this?
+    #FIXME - do I need this?  It looks non-good.
     config.add_route('server_by_id', '/servers/by_id/{name}')
 
     # Server state-related calls.
 
-    config.add_route('states', '/states')       # FIXME - Remove.  Really?  Shouldn't this dump out the
-                                                # mapping of state->count that I need for my agent controller?
+    config.add_route('states', '/states')       # Get count of servers in each state
     config.add_route('state',  '/states/{name}') # Get list of servers in
                                                  # the given state.
 
     # FIXME
     # What do these do?  And if we really need them, can we generate them
     # by looping over server.get_state_list()?
-    # Looking at views.py, there is custom logic, so for example if you set
+    # Looks like they are all just for PUT calls to set the state of a server.
+    # Looking at views.py, there is some custom logic, so for example if you set
     # a server Boosting it will set up a deboost and also change the credit.
     # But I strongly suspect that Ben's logic is broken here.
     config.add_route('server_Starting',      '/servers/{name}/Starting')

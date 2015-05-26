@@ -32,6 +32,7 @@ class TestAgentAPI(unittest.TestCase):
         user_id = server.create_user("users", "testuser", "testuser", "testuser")
         server.touch_to_add_credit(user_id, 200)
 
+    #Static method
     def _ini_filter(line):
         """Annoyingly, get_app() does not allow you a hook to modify the .ini
            data before the app is instantiated.
@@ -44,6 +45,7 @@ class TestAgentAPI(unittest.TestCase):
                 r'agent.secretfile = %s' % secret_file,
                 line)
 
+    #Static method
     def _ini_filter_del(line):
         """This version removes the line completely
         """
@@ -166,6 +168,19 @@ class TestAgentAPI(unittest.TestCase):
         """
         with patch.dict('os.environ', {'authtkt_secretfile': "NOT_A_REAL_FILE_12345"}):
             self.assertRaises(FileNotFoundError, get_app, test_ini)
+
+    # Note that detailed tests for get(/states) and get(/states/XYZ) are in test_vm_actions_http
+    def test_states_empty(self):
+        server.setup_states()
+
+        #Get a valid log-in
+        app = TestApp(get_app(test_ini))
+        settings = get_appsettings(test_ini)
+        app.authorization = ('Basic', ('agent', settings['agent.secret']))
+
+        r = app.get('/states')
+
+        self.assertEqual(r.json, { s : 0 for s in server.get_state_list() })
 
 
 ####### Helper code, lets me modify file contents on-the-fly.
