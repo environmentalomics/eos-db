@@ -133,6 +133,7 @@ def get_state_list():
             'Pre_Deboosting',
             'Pre_Deboosted',
             'Deboosted',
+            'Error'
             )
 
     if EXTRA_STATES:

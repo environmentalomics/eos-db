@@ -7,7 +7,7 @@ from pyramid.events import NewRequest, NewResponse
 from pyramid.security import authenticated_userid, remember
 
 import logging
-import os
+import sys, os
 import warnings
 
 from eos_db import server
@@ -130,7 +130,7 @@ def get_secret(settings, secret):
         to be shared with the agents.
         On the production system these must be securely generated at startup.
         On the test system we can use placeholder values, but in either case there
-        is no excuse for hard-coding them into the script.
+        is no need for hard-coding them into the script here.
 
         :params
         :settings dict: settings
@@ -151,6 +151,9 @@ def get_secret(settings, secret):
     else:
         #If a secret is supplied directly, use it.
         res = settings.get(secret + ".secret")
+        if res and 'unittest' not in sys.modules:
+            log.critical("Reading " +secret+ "secret directly from .ini file. " +
+                         "This should only be used for testing.")
 
     if not res:
         raise ValueError("The secret cannot be empty.")
@@ -159,7 +162,7 @@ def get_secret(settings, secret):
 
 #FIXME? main takes global_config as an argument here but why?
 # Also - Is this called just once per initialisation?  Ie. can I generate my
-# shared secret here?
+# token secret here?
 def main(global_config, **settings):
     """ Set routes, authentication policies, and add callbacks to modify
     responses."""
@@ -231,8 +234,9 @@ def main(global_config, **settings):
                                                     # Post new server or
                                                     # Delete server
 
-    #FIXME - do I need this?  It looks non-good.
-    config.add_route('server_by_id', '/servers/by_id/{name}')
+    #This is used by the agents.  Can help to be absolutely sure you are talking
+    #about the right server.
+    config.add_route('server_by_id', '/servers/by_id/{id}')
 
     # Server state-related calls.
 
@@ -240,28 +244,20 @@ def main(global_config, **settings):
     config.add_route('state',  '/states/{name}') # Get list of servers in
                                                  # the given state.
 
-    # FIXME
-    # What do these do?  And if we really need them, can we generate them
-    # by looping over server.get_state_list()?
-    # Looks like they are all just for PUT calls to set the state of a server.
-    # Looking at views.py, there is some custom logic, so for example if you set
-    # a server Boosting it will set up a deboost and also change the credit.
-    # But I strongly suspect that Ben's logic is broken here.
-    config.add_route('server_Starting',      '/servers/{name}/Starting')
-    config.add_route('server_Stopping',      '/servers/{name}/Stopping')
-    config.add_route('server_Restarting',    '/servers/{name}/Restarting')
-    config.add_route('server_pre_deboost',   '/servers/{name}/Pre_Deboosting')
-    config.add_route('server_pre_deboosted', '/servers/{name}/Pre_Deboosted')
-    config.add_route('server_started',       '/servers/{name}/Started')
-    config.add_route('server_stopped',       '/servers/{name}/Stopped')
-    config.add_route('server_prepare',       '/servers/{name}/Preparing')
-    config.add_route('server_prepared',      '/servers/{name}/Prepared')
+    #Define PUT calls to put the server into various states.  Each call is backed
+    #by a separate function in views.py, and mostly these just add a touch, but
+    #they may implement custom functionality, for example to chack and deduct
+    #credit when boosting, or to limit who can change to certain states.
+    for state in server.get_state_list():
+        config.add_route('server_' + state,   '/servers/{name}/' + state)
+        config.add_route('server_by_id_' + state,   '/servers/by_id/{id}/' + state)
+
+    #Call to boost the server.
     config.add_route('server_boost',         '/servers/{name}/Boosting')
-    config.add_route('server_boosted',       '/servers/{name}/Boosted')
-    config.add_route('server_error',         '/servers/{name}/Error')
+    config.add_route('server_by_id_boost',         '/servers/by_id/{id}/Boosting')
 
     config.add_route('server_state',
-                     '/servers/{name}/state') # Get or put server state
+                     '/servers/{name}/state') # Allows you to get the server state
     config.add_route('server_owner',
                      '/servers/{name}/owner')  # Get or put server ownership
     config.add_route('server_touches',
