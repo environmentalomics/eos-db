@@ -291,11 +291,9 @@ def return_artifact_details(artifact_id, artifact_name="", artifact_uuid="", ses
     if not artifact_name:
         artifact_name = get_server_name_from_id(artifact_id, session=session)
 
-    #For some reason uuid and name have been declared as CHAR in the DB
-    #and so they come out space-padded on PostgreSQL.  Strip them here.
     return({"artifact_id": artifact_id,
-            "artifact_uuid": artifact_uuid.rstrip(),
-            "artifact_name": artifact_name.rstrip(),
+            "artifact_uuid": artifact_uuid,
+            "artifact_name": artifact_name,
             "change_dt": str(change_dt[0])[0:16],
             "create_dt": str(create_dt[0])[0:16],
             "state": state,
@@ -327,11 +325,13 @@ def get_server_name_from_id(artifact_id, session):
     :param artifact_id: A valid artifact id.
     :returns: name of artifact.
     """
+    #For some reason uuid and name have been declared as CHAR in the DB
+    #and so they come out space-padded on PostgreSQL.  Strip them here.
     artifact_name = (session
                      .query(Artifact.name)
                      .filter(Artifact.id == artifact_id)
                      .first())
-    return artifact_name[0]
+    return artifact_name[0].rstrip()
 
 @with_session
 def get_server_id_from_name(name, session):
@@ -466,8 +466,10 @@ def get_server_uuid_from_id(id, session):
     :param artifact_id: A valid artifact id.
     :returns: uuid of artifact.
     """
+    #For some reason uuid and name have been declared as CHAR in the DB
+    #and so they come out space-padded on PostgreSQL.  Strip them here.
     server = session.query(Artifact.uuid).filter(Artifact.id == id).first()
-    return server[0]
+    return server[0].rstrip()
 
 @with_session
 def check_ownership(artifact_id, actor_id, session):
