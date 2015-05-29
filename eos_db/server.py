@@ -432,11 +432,11 @@ def get_deboost_credits(artifact_id):
     hours = get_hours_until_deboost(artifact_id, session=session)
     cores, ram = get_latest_specification(artifact_id, session=session)
     multiplier = 0
-    if ram == 40:
+    if cores == 2:
         multiplier = 1
-    if ram == 140:
+    if cores == 8:
         multiplier = 3
-    if ram == 500:
+    if cores == 16:
         multiplier = 12
     return multiplier * hours
 
@@ -546,8 +546,31 @@ def touch_to_add_deboost(vm_id, hours):
     touch_id = _create_touch(None, vm_id, None)
     set_deboost(hours, touch_id)
 
-def check_and_remove_credits(vm_id, cpu, cores, hours):
-    pass
+def check_and_remove_credits(actor_id, ram, cores, hours):
+    """Called when a machine is boosted to see if the user can afford it.
+    """
+
+    if actor_id is None:
+        #This would happen if an agent called this function
+        return 0
+
+    #FIXME - should not be using hard-coded values here
+    multiplier = 0
+    if cores == 2:
+        multiplier = 1
+    if cores == 8:
+        multiplier = 3
+    if cores == 16:
+        multiplier = 12
+    cost = multiplier * hours
+
+    #See if the user can afford it...
+    current_credit = check_credit(actor_id)
+    if current_credit >= cost:
+        touch_to_add_credit(actor_id, -cost)
+        return cost
+    else:
+        return None
 
 def check_progress(job_id):
     """Looks for the most recent status value in the in-memory progress table.

@@ -74,10 +74,9 @@ def home_view(request):
                               "server_Deboosted": "/servers/{name}/Deboosted",
                               "server_Started": "/servers/{name}/Started",
                               "server_Stopped": "/servers/{name}/Stopped",
-                              "server_Prepare": "/servers/{name}/prepare",
+                              "server_Preparing": "/servers/{name}/preparing",
                               "server_Prepared": "/servers/{name}/prepared",
-                              "server_Boost": "/servers/{name}/boost",
-                              "server_Boosted": "/servers/{name}/boosted",
+                              "server_Boost": "/servers/{name}/Boost",
                               "server_owner": "/servers/{name}/owner",
                               "server_touches": "/servers/{name}/touches",
                               "server_job_status": "/servers/{name}/job/{job}/status",
@@ -105,6 +104,7 @@ def options2(request):
     return resp
 
 @view_config(request_method="OPTIONS", routes=["server_" + x for x in server.get_state_list()])
+@view_config(request_method="OPTIONS", routes=["server_Boost"])
 def options3(request):
     resp = Response(None)
     resp.headers['Allow'] = "HEAD,POST,OPTIONS"
@@ -375,8 +375,11 @@ def get_server_owner(request):
     # Not implemented. Check if necessary.  A server can have many owners.
     return HTTPNotImplemented()
 
-def _set_server_state(request, target_state):
-    """Basic function for putting a server into some state, for basic state-change calls."""
+def _resolve_vm(request):
+    """Function given a request works out the VM we are talking about and whether
+       the current user actually has permission to do stuff to it.
+    """
+
     actor_id = None
     vm_id = None
     try:
@@ -385,19 +388,23 @@ def _set_server_state(request, target_state):
         #OK, it must be an agent or an internal call.
         pass
     try:
-        vm_id = ( request.matchdict['id'] 
+        vm_id = ( request.matchdict['id']
                   if 'id' in request.matchdict else
                   server.get_server_id_from_name(request.matchdict['name']) )
     except:
         #Presumably because there is no such VM
-        return HTTPNotFound()
+        raise HTTPNotFound()
 
     if ( request.has_permission('act') or
          server.check_ownership(vm_id, actor_id) ):
-        touch_id = server.touch_to_state(actor_id, vm_id, target_state)
-        return touch_id
+        return vm_id, actor_id
     else:
-        return HTTPUnauthorized()
+        raise HTTPUnauthorized()
+
+def _set_server_state(request, target_state):
+    """Basic function for putting a server into some state, for basic state-change calls."""
+    vm_id, actor_id = _resolve_vm(request)
+    return server.touch_to_state(actor_id, vm_id, target_state)
 
 
 @view_config(request_method="POST", routes=['server_Starting', 'server_by_id_Starting'],
@@ -443,9 +450,10 @@ def stop_server(request):
     return _set_server_state(request, "Stopping")
 
 @view_config(request_method="POST", routes=['server_Preparing', 'server_by_id_Preparing'],
-             renderer='json', permission="use")
+             renderer='json', permission="act")
 def prepare_server(request):
     """Put a server into the "Preparing" status.
+       A regular user can only do this indirectly, by calling server/Boost
 
     :param vm_id: ID of VApp which we want to stop.
     :returns: JSON containing VApp ID and job ID for progress calls.
@@ -473,34 +481,46 @@ def pre_deboost_server(request):
     """
     return _set_server_state(request, "Pre_Deboosting")
 
-@view_config(request_method="POST", routes=['server_boost', 'server_by_id_boost'],
+@view_config(request_method="POST", routes=['server_Boost', 'server_by_id_Boost'],
              renderer='json', permission="use")
 def boost_server(request):
-    """Put a server into the "pre-boost" status.
+    """Boost a server: ie:
+        Debit the users account
+        Schedule a De-Boost
+        Set the CPUs and RAM
+        Put the server in a "preparing" status
 
-    :param vm_id: ID of VApp which we want to stop.
+    :param {vm or name}: ID of VApp which we want to boost.
+    :ram: ram wanted
+    :cores: cores wanted
+    :hours: hours of boost wanted
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    actor_id = server.get_user_id_from_name(request.authenticated_userid)
-    vm_id = server.get_server_id_from_name(request.matchdict['name'])
-    touch_id = server.touch_to_state(actor_id, vm_id, "Boosting")  # Boost Server
-    # FIXME: I'd commented this part of the code out to work on other things.
-    # Should just be decommentable.
+    vm_id, actor_id = _resolve_vm(request)
 
-    # Now check if boost was successful, set deboost and remove credits accordingly.
-    # if touch_id:
-    # FIXME - this is a no-op, as credits are being removed directly just now.  Also
-    # we need to know the actor_id.
-    credit_change = server.check_and_remove_credits(request.POST['vm_id'],
-                                                    request.POST['ram'],
-                                                    request.POST['cores'],
-                                                    request.POST['hours'])
-    server.touch_to_add_deboost(request.POST['vm_id'], request.POST['hours'])
-    return credit_change
+    hours = int(request.POST['hours'])
+    cores = int(request.POST['cores'])
+    ram   = int(request.POST['ram'])
+
+    # FIXME: Really the user should boost to a named level, rather than directly
+    # specifying RAM and cores.  For now I'm just going to work out the cost based
+    # on the cores requested, and assume the RAM level matches it.
+    cost = server.check_and_remove_credits(actor_id, ram, cores, hours)
+
+    #Schedule a de-boost
+    server.touch_to_add_deboost(vm_id, hours)
+
+    # Set spec
+    server.touch_to_add_specification(vm_id, cores, ram)
+
+    # Tell the agents to get to work.
+    touch_id = server.touch_to_state(actor_id, vm_id, "Preparing")
+
+    return dict(vm_id=vm_id, cost=cost)
 
 
 @view_config(request_method="POST", routes=['server_Stopped', 'server_by_id_Stopped'],
-             renderer='json', permission="use")
+             renderer='json', permission="act")
 def stopped_server(request):
     """Put a server into the "Stopped" status.
 
@@ -510,7 +530,7 @@ def stopped_server(request):
     return _set_server_state(request, "Stopped")
 
 @view_config(request_method="POST", routes=['server_Started', 'server_by_id_Started'],
-             renderer='json', permission="use")
+             renderer='json', permission="act")
 def started_server(request):
     """Put a server into the "Started" status.
 
@@ -531,7 +551,7 @@ def error_server(request):
     return touch_id
 
 @view_config(request_method="POST", routes=['server_Prepared', 'server_by_id_Prepared'],
-             renderer='json', permission="use")
+             renderer='json', permission="act")
 def prepared_server(request):
     """Put a server into the "Prepared" status.
 
@@ -541,7 +561,7 @@ def prepared_server(request):
     return _set_server_state(request, "Prepared")
 
 @view_config(request_method="POST", routes=['server_Pre_Deboosted', 'server_by_id_Pre_Deboosted'],
-             renderer='json', permission="use")
+             renderer='json', permission="act")
 def predeboosted_server(request):
     """Put a server into the "Pre_Deboosted" status.
 
@@ -551,7 +571,7 @@ def predeboosted_server(request):
     return _set_server_state(request, "Pre_Deboosted")
 
 @view_config(request_method="POST", routes=['server_Deboosted', 'server_by_id_Deboosted'],
-             renderer='json', permission="use")
+             renderer='json', permission="act")
 def deboosted_server(request):
     """Put a server into the "Pre_Deboosted" status.
 

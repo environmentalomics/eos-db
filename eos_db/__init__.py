@@ -246,8 +246,8 @@ def main(global_config, **settings):
         config.add_route('server_by_id_' + state,   '/servers/by_id/{id}/' + state)
 
     #Call to boost the server.
-    config.add_route('server_boost',         '/servers/{name}/Boosting')
-    config.add_route('server_by_id_boost',         '/servers/by_id/{id}/Boosting')
+    config.add_route('server_Boost',         '/servers/{name}/Boost')
+    config.add_route('server_by_id_Boost',         '/servers/by_id/{id}/Boost')
 
     config.add_route('server_state',
                      '/servers/{name}/state') # Allows you to get the server state
