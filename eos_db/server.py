@@ -277,13 +277,16 @@ def list_artifacts_for_user(user_id, session):
     #twice while still maintaining database order.
     artifacts = OrderedDict()
     for server in servers:
+        #Cleanup CHAR values
+        server[1] = server[1].rstrip()
+        server[2] = server[2].rstrip()
         if server[1] in artifacts:
             del artifacts[server[1]]
         artifacts[server[1]] = return_artifact_details(*server, session=session)
     return artifacts.values()
 
 @with_session
-def return_artifact_details(artifact_id, artifact_name="", artifact_uuid="", session=None):
+def return_artifact_details(artifact_id, artifact_name=None, artifact_uuid=None, session=None):
 
     """ Return basic information about each server. """
     change_dt = _get_most_recent_change(artifact_id, session=session)
