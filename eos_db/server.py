@@ -277,9 +277,11 @@ def list_artifacts_for_user(user_id, session):
     #twice while still maintaining database order.
     artifacts = OrderedDict()
     for server in servers:
-        #Cleanup CHAR values
+        #Cleanup CHAR values - really should fix this in the DB
+        server = list(server)
         server[1] = server[1].rstrip()
         server[2] = server[2].rstrip()
+        #END workaround
         if server[1] in artifacts:
             del artifacts[server[1]]
         artifacts[server[1]] = return_artifact_details(*server, session=session)
