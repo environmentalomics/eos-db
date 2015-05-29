@@ -56,7 +56,6 @@ class PermissionsMap():
 def home_view(request):
     """ Return a list of all valid API calls by way of documentation. """
     call_list = {"Valid API Call List":{
-                              "Setup States": "/setup_states",
                               "Retrieve User List": "/users",
                               "Get my details": "/user",
                               "Get my touches": "/user/touches",
@@ -112,22 +111,6 @@ def options3(request):
     return resp
 
 # End of OPTIONS guff
-
-@view_config(request_method="POST", route_name='setup', renderer='json', permission="use")
-def setup(request):
-    """ Deploy tables into a database. """
-    #server.choose_engine("SQLite")
-    server.deploy_tables()
-    return None
-
-# FIXME - permission=admisister, surely??  And for the one above.
-@view_config(request_method="POST", route_name='setup_states', renderer='json', permission="use")
-def setup_states(request):
-    """ Deploy list of valid artifact states into database. The states are in server.py
-        and may be supplemented in settings.py
-    """
-    server.setup_states()
-    return None
 
 @view_config(request_method="GET", route_name='users', renderer='json', permission="use")
 def retrieve_users(request):

@@ -31,16 +31,15 @@ class TestUnAuth(unittest.TestCase):
         self.testapp.authorization = None
         self.testapp.cookiejar.set_policy(DefaultCookiePolicy(allowed_domains=[]))
 
-        #Do this because the authentication system needs to look at the user tables.
-        server.deploy_tables()
-
     def test_nosetup(self):
         """Does the API refuse to set up the database?
+           Note that these 2 API calls have now been removed entirely, hence
+           404 errors.
         """
         app = self.testapp
 
-        response = app.post('/setup', status=403, expect_errors=True)
-        response = app.post('/setup_states', status=403, expect_errors=True)
+        response = app.post('/setup', status=404, expect_errors=True)
+        response = app.post('/setup_states', status=404, expect_errors=True)
 
 
     def test_homepage(self):

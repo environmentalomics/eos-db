@@ -53,8 +53,8 @@ class TestVMActionsHTTP(unittest.TestCase):
 
         self.app.authorization = ('Basic', ('administrator', 'adminpass'))
 
-        # This both sets up the database and sorts out the auth token
-        self.app.post('/setup_states')
+        # This sorts out the auth token cookie.
+        self.app.get('/users')
         self.app.authorization = None
 
     """VM-related API functions."""

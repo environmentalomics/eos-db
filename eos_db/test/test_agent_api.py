@@ -171,8 +171,6 @@ class TestAgentAPI(unittest.TestCase):
 
     # Note that detailed tests for get(/states) and get(/states/XYZ) are in test_vm_actions_http
     def test_states_empty(self):
-        server.setup_states()
-
         #Get a valid log-in
         app = TestApp(get_app(test_ini))
         settings = get_appsettings(test_ini)

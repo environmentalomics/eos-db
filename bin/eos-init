@@ -4,6 +4,11 @@ from sys import exit, stdout
 import traceback
 
 # Import EOS server access library.
+print(
+"""It is no longer necessary to call eos-init as the portal will bootstrap itself upon
+startup, but you might still find it useful to run this to check that the database setup
+is OK and to diagnose problems.
+""")
 
 try:
     from eos_db import server
@@ -35,10 +40,12 @@ except:
 # Create entries for permissible states in state machine.  Note that these are
 # now in the config, so we don't need to list them here.
 
+added = 0
 try:
-    server.setup_states()
+    added = server.setup_states(ignore_dupes=True)
+    print("Added %i new valid states." % added)
 
-except:
+except Exception as e:
     traceback.print_exc(file=stdout)
     exit( "Init-EOS failed to deploy data to Postgres. " +
           "Please ensure that you have set up a Postgres instance with the " +

@@ -41,9 +41,6 @@ class TestAdminAPI(unittest.TestCase):
 
         self.app.authorization = ('Basic', ('administrator', 'adminpass'))
 
-        # Don't need this for all tests.
-        #self.app.post('/setup_states')
-
     """Unauthenticated API functions."""
 
     def test_home_view(self):

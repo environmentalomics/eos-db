@@ -18,6 +18,7 @@ from eos_db.models import ( Artifact, Appliance, Registration,
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
+from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timedelta
 
 engine = None  # Assume no default database connection
@@ -31,12 +32,6 @@ except:
     # This bare except statement is legit.
     # If no settings file is supplied, we connect to the database eos_db without
     # a username or password - ie. rely on PostgreSQL ident auth.
-    pass
-
-EXTRA_STATES = None
-try:
-    from eos_db.settings import MachineStates as EXTRA_STATES
-except:
     pass
 
 def with_session(f):
@@ -103,13 +98,20 @@ def choose_engine(enginestring, replace=True):
     else:
         raise LookupError("Invalid server type.")
 
-def override_engine(engine_string):
-    """Sets the target database to a different location than that specified in
-    the server module.
+    # Always do this.  This bootstraps the database for us, and ensures
+    # any new states are added.
+    setup_states()
+
+
+def override_engine(engine_string, echo=True):
+    """Sets the target database explicitly to a different location than that
+    specified in the server module.
+    Note that this doen not deploy the tables - you need to call setup_states()
+    or deploy_tables() explicitly afterwards if you want to do that.
     :param engine_string: A SQLAlchemy server string, eg. 'sqlite://'
     """
     global engine
-    engine = create_engine(engine_string, echo=True)
+    engine = create_engine(engine_string, echo=echo)
 
 def deploy_tables():
     """Create tables in their current state in the currently connected
@@ -133,20 +135,35 @@ def get_state_list():
             'Pre_Deboosting',
             'Pre_Deboosted',
             'Deboosted',
+            'Boosting',   # Transitional state
+            'Deboosting', # Transitional state
             'Error'
             )
 
-    if EXTRA_STATES:
+    try:
+        from eos_db.settings import MachineStates as EXTRA_STATES
         return state_list + tuple(s for s in EXTRA_STATES.state_list if s not in state_list )
-    else:
+    except:
         return state_list
 
 
-def setup_states():
+def setup_states(ignore_dupes=True):
     """ Write the list of valid states to the database.
-        The states need to be unique."""
+        The states are in server.py and may be supplemented in settings.py.
+        With ignore_dupes=False this will throw an exception if you try to
+        add the same state twice, otherwise it will just ignore the error - ie.
+        it will just add new states and will be idempotent.
+    """
+    Base.metadata.create_all(engine)
+    states_added = 0
     for state in get_state_list():
+        try:
             create_artifact_state(state)
+            states_added += 1
+        except IntegrityError as e:
+            if not ignore_dupes: raise e
+
+    return states_added
 
 @with_session
 def list_user_ids(session):
@@ -495,7 +512,7 @@ def check_ownership(artifact_id, actor_id, session):
 def get_state_id_by_name(name, session):
     """Gets the id of a state from the name associated with it.
 
-    :param name: A printable state name, as passed to setup_states
+    :param name: A printable state name, as in get_state_list()
     :returns: The corresponding internal state_id
     :raises: IndexError if there is no such state
     """
@@ -506,7 +523,7 @@ def get_state_id_by_name(name, session):
 
 def touch_to_state(actor_id, artifact_id, state_name):
     """Creates a touch to move the VM into a given status.
-    The state must be a valid state name as passed to setup_states
+    The state must be a valid state name as found in get_state_list()
     - eg. Started, Restarting.
 
     :param actor_id: User who is initiating the touch.  Can be None.

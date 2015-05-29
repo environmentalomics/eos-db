@@ -192,14 +192,7 @@ def main(global_config, **settings):
     server.choose_engine(settings['server'], replace=False)
 
     # Top-level home page. Yields API call list.
-
     config.add_route('home', '/')
-
-    # FIXME - database setup should be done when the server starts, not as
-    # an API call.
-    # FIXME2 - remove both these and all calls from the test code
-    config.add_route('setup',        '/setup')
-    config.add_route('setup_states', '/setup_states')
 
     # User-related API calls (callable by users)
 

@@ -12,10 +12,10 @@ class TestVMActions(unittest.TestCase):
     """Tests VM actions in server module.
     """
     def setUp(self):
-        s.choose_engine('SQLite')
-        s.deploy_tables()
+        s.override_engine('sqlite://', echo=False)
 
-        s.setup_states()
+        #Need this since I called override_engine rather than choose_engine
+        s.setup_states(ignore_dupes=False)
 
         # Not a real UUID!
         self._uuid = 48878
@@ -65,16 +65,6 @@ class TestVMActions(unittest.TestCase):
         s.touch_to_state(None, artifact_id, "Preparing")
         status = s.check_state(artifact_id)
         self.assertEqual(status, "Preparing")
-
-    @unittest.expectedFailure
-    def test_boost_server(self):
-        """Check touch_to_state puts a server into "Boosting" state.
-            ** Expected fail - Boosting state was removed
-        """
-        artifact_id = self.my_create_appliance("testboost")
-        s.touch_to_state(None, artifact_id, "Boosting")
-        status = s.check_state(artifact_id)
-        self.assertEqual(status, "Boosting")
 
     def test_server_invalid_state(self):
         """Check touch_to_state won't put a server into "BAD" state.

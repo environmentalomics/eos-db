@@ -195,7 +195,6 @@ class TestUserAPI(unittest.TestCase):
         """ Check that a server appears in state 'Starting' after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
-        server.setup_states()
         server_id = self.create_server('fooserver', 'testuser')
         self.app.post('/servers/fooserver/Starting')
 
