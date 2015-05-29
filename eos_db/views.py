@@ -77,6 +77,7 @@ def home_view(request):
                               "server_Preparing": "/servers/{name}/preparing",
                               "server_Prepared": "/servers/{name}/prepared",
                               "server_Boost": "/servers/{name}/Boost",
+                              "server_Deboost": "/servers/{name}/Deboost",
                               "server_owner": "/servers/{name}/owner",
                               "server_touches": "/servers/{name}/touches",
                               "server_job_status": "/servers/{name}/job/{job}/status",
@@ -104,7 +105,8 @@ def options2(request):
     return resp
 
 @view_config(request_method="OPTIONS", routes=["server_" + x for x in server.get_state_list()])
-@view_config(request_method="OPTIONS", routes=["server_Boost"])
+@view_config(request_method="OPTIONS", routes=["server_Boost", "server_Deboost"])
+@view_config(request_method="OPTIONS", routes=["server_by_id_Boost", "server_by_id_Deboost"])
 def options3(request):
     resp = Response(None)
     resp.headers['Allow'] = "HEAD,POST,OPTIONS"
@@ -517,6 +519,39 @@ def boost_server(request):
     touch_id = server.touch_to_state(actor_id, vm_id, "Preparing")
 
     return dict(vm_id=vm_id, cost=cost)
+
+@view_config(request_method="POST", routes=['server_Deboost', 'server_by_id_Deboost'],
+             renderer='json', permission="use")
+def deboost_server(request):
+    """Deboost a server: ie:
+        Credit the users account
+        Cancel any scheduled De-Boost
+        Set the CPUs and RAM to the previous state
+        Put the server in a "Pre_Deboosting" status
+
+    :param {vm or name}: ID of VApp which we want to deboost.
+    :returns: ???
+    """
+    vm_id, actor_id = _resolve_vm(request)
+
+    credit = server.get_deboost_credits(vm_id)
+    server.touch_to_add_credit(actor_id, credit)
+
+    #FIXME - cancel the deboost.  How??
+
+    #FIXME - yet more hard-coding for cores/RAM
+    prev_cores = 1
+    prev_ram = 16
+    try:
+        prev_cores, prev_ram = server.get_previous_specification(vm_id)
+    except:
+        #OK, use the defaults.
+        pass
+
+    server.touch_to_add_specification(vm_id, prev_cores, prev_ram)
+
+    # Tell the agents to get to work.
+    touch_id = server.touch_to_state(actor_id, vm_id, "Pre_Deboosting")
 
 
 @view_config(request_method="POST", routes=['server_Stopped', 'server_by_id_Stopped'],

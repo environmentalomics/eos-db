@@ -423,7 +423,7 @@ def _get_server_boost_status(artifact_id):
         return "Unboosted"
 
 @with_session
-def get_deboost_credits(artifact_id):
+def get_deboost_credits(artifact_id, session):
     """ Get the number of credits which should be refunded upon deboost.
 
     :param artifact_id: The artifact in question by ID.
@@ -647,15 +647,16 @@ def get_latest_deboost_dt(vm_id, session):
               .first() )
     return state
 
-def get_hours_until_deboost(vm_id):
+#No with_session decorator needed, but a sesh might be passed through.
+def get_hours_until_deboost(vm_id, session=None):
     """ Get the number of hours until a VM is due to deboost. """
     now = datetime.now()
-    deboost_dt = get_latest_deboost_dt(vm_id)[0]
+    deboost_dt = get_latest_deboost_dt(vm_id,session=session)[0]
     d = deboost_dt - now
     return int(d.total_seconds() / 3600)
 
 @with_session
-def get_previous_specification(vm_id, index, session):
+def get_previous_specification(vm_id, index=1, session=None):
     """
     """
     state = ( session
@@ -665,7 +666,7 @@ def get_previous_specification(vm_id, index, session):
               .filter(Touch.touch_dt != None)
               .order_by(Touch.touch_dt.desc())
               .all() )
-    return state[1]
+    return state[index]
 
 
 def touch_to_add_node():
