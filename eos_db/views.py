@@ -586,8 +586,7 @@ def error_server(request):
     :param name: Name of VApp which we want to change
     :returns: JSON containing VApp ID and job ID for progress calls.
     """
-    touch_id = server.touch_to_state(request.matchdict['name'], "Error")
-    return touch_id
+    return _set_server_state(request, "Error")
 
 @view_config(request_method="POST", routes=['server_Prepared', 'server_by_id_Prepared'],
              renderer='json', permission="act")

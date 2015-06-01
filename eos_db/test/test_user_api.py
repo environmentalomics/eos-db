@@ -187,10 +187,6 @@ class TestUserAPI(unittest.TestCase):
 
     """ Server State-Change Functions. """
 
-    def test_retrieve_servers_in_state(self):
-        """ 200 OK from this call for all legal states."""
-        #FIXME - move this to agent tests.
-
     def test_start_server(self):
         """ Check that a server appears in state 'Starting' after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
@@ -211,6 +207,15 @@ class TestUserAPI(unittest.TestCase):
         servers_in_state = self.app.get('/states/Starting').json
         self.assertEqual(len(servers_in_state), 1)
         self.assertEqual(servers_in_state[0]['artifact_name'], 'fooserver')
+
+    def test_error_by_id_server(self):
+        """ Check that i can put a server into Error state, refereced by ID
+        """
+        server_id = self.create_server('fooserver', 'testuser')
+        self.app.post('/servers/by_id/%i/Error' % server_id)
+
+        server_info = self.app.get('/servers/fooserver').json
+        self.assertEqual(my_server['state'], 'Error')
 
     def test_restart_server(self):
         """ Check that a server appears in state 'Restarted' after using the
