@@ -245,11 +245,10 @@ def main(global_config, **settings):
         config.add_route('server_' + state,   '/servers/{name}/' + state)
         config.add_route('server_by_id_' + state,   '/servers/by_id/{id}/' + state)
 
-    #Call to boost/deboost the server.
-    config.add_route('server_Boost',           '/servers/{name}/Boost')
-    config.add_route('server_by_id_Boost',     '/servers/by_id/{id}/Boost')
-    config.add_route('server_Deboost',         '/servers/{name}/Deboost')
-    config.add_route('server_by_id_Deboost',   '/servers/by_id/{id}/Deboost')
+    #Call to boost/deboost the server and get/set specification.
+    for action in ('Boost', 'Deboost', 'specification'):
+        config.add_route('server_' + action      , '/servers/{name}/' + action    )
+        config.add_route('server_by_id_' + action, '/servers/by_id/{id}/' + action)
 
     config.add_route('server_state',
                      '/servers/{name}/state') # Allows you to get the server state
@@ -260,11 +259,6 @@ def main(global_config, **settings):
     config.add_route('server_job_status',
                      '/servers/{name}/job/{job}/status')  # Get server touches
 
-    # Server configuration change calls.
-
-    config.add_route('server_specification',
-                     'servers/{name}/specification')    # Get or put server
-                                                       # specification
 
     config.scan()
     return config.make_wsgi_app()

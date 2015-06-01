@@ -81,7 +81,7 @@ def home_view(request):
                               "server_owner": "/servers/{name}/owner",
                               "server_touches": "/servers/{name}/touches",
                               "server_job_status": "/servers/{name}/job/{job}/status",
-                              "server_specification": "/servers/{name}/specification"
+                              "CPU/RAM Specification": "/servers/{name}/specification"
                               }
                  }
     return call_list
@@ -99,6 +99,7 @@ def options(request):
     return resp
 
 @view_config(request_method="OPTIONS", routes=['server', 'server_specification'])
+@view_config(request_method="OPTIONS", routes=['server_by_id', 'server_by_id_specification'])
 def options2(request):
     resp = Response(None)
     resp.headers['Allow'] = "HEAD,GET,POST,OPTIONS"
@@ -534,6 +535,9 @@ def deboost_server(request):
     """
     vm_id, actor_id = _resolve_vm(request)
 
+    # FIXME: This also needs to look up the other servers currently boosted
+    # and return a bad request if there is not enough capacity.
+
     credit = server.get_deboost_credits(vm_id)
     server.touch_to_add_credit(actor_id, credit)
 
@@ -633,32 +637,30 @@ def retrieve_server_touches(request):
     name = request.matchdict['name']
     return name
 
-@view_config(request_method="POST", route_name='server_specification', renderer='json', permission="use")
+@view_config(request_method="POST", renderer='json', permission="act",
+             routes=['server_specification', 'server_by_id_specification'])
 def set_server_specification(request):
     """ Set number of cores and amount of RAM for a VM. These numbers should
-    only match the given specification types listed below. """
+        only match the given specification types listed below.
+        Regular users can only do this indirectly via boost/deboost.
+    """
+    vm_id, actor_id = _resolve_vm(request)
 
-    # FIXME: This also needs to look up the other servers currently boosted
-    # and return a bad request if there is not enough capacity.
-
-    name = request.matchdict['name']
-    vm_id = server.get_server_id_from_name(name)
-
-    # Filter for bad requests
-    # FIXME - check against valid machine states in settings.py
-
-    if (request.POST['cores'] not in ['1', '2', '4', '16']) or (request.POST['ram'] not in ['1', '4', '8', '16', '500']):
-        # FIXME - This really shouldn't be hardcoded.
+    # FIXME - This really shouldn't be hardcoded.
+    cores = request.POST.get('cores')
+    ram = request.POST.get('ram')
+    if (cores not in ['1', '2', '4', '16']) or (ram not in ['1', '4', '8', '16', '400']):
         return HTTPBadRequest()
     else:
-        server.touch_to_add_specification(vm_id, request.POST['cores'], request.POST['ram'])
-        return name
+        server.touch_to_add_specification(vm_id, cores, ram)
+        return dict(cores=cores, ram=ram, artifact_id=vm_id)
 
-@view_config(request_method="GET", route_name='server_specification', renderer='json', permission="use")
+@view_config(request_method="GET", renderer='json', permission="use",
+             routes=['server_specification', 'server_by_id_specification'])
 def get_server_specification(request):
     """ Get the specification of a machine. Returns RAM in GB and number of
     cores in a JSON object."""
-    name = request.matchdict['name']
-    vm_id = server.get_server_id_from_name(name)
+    vm_id, actor_id = _resolve_vm(request)
+
     cores, ram = server.get_latest_specification(vm_id)
-    return {"cores":cores, "ram":ram}
+    return dict(cores=cores, ram=ram, artifact_id=vm_id)
