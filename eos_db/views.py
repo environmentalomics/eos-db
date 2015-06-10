@@ -606,9 +606,9 @@ def deboosted_server(request):
 @view_config(request_method="GET", route_name='deboosts', renderer='json', permission="act")
 def deboost_jobs(request):
     """ Calls get_deboost_jobs, which is what the deboost_daemon needs in order to work.
-        Defaults to getting all deboosts that expired within the last hour.
+        Defaults to getting all deboosts that expired within the last 60 minutes.
     """
-    past = int(request.params.get('past', 1))
+    past = int(request.params.get('past', 60))
     future = int(request.params.get('future', 0))
 
     return server.get_deboost_jobs(past, future)

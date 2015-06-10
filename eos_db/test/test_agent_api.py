@@ -222,16 +222,16 @@ class TestAgentAPI(unittest.TestCase):
         self.assertTrue(server_1_tud[1] < (-13 * 60 * 60))
 
         #Look for all jobs - should be 4
-        dj1 = app.get('/deboost_jobs', dict(past=24, future=12)).json
+        dj1 = app.get('/deboost_jobs', dict(past=24*60, future=12*60)).json
         self.assertEqual(len(dj1), 4)
 
         #Look for jobs in last 12 hours (what the deboost_daemon will normally do)
-        dj2 = app.get('/deboost_jobs', dict(past=12)).json
+        dj2 = app.get('/deboost_jobs', dict(past=12*60)).json
         self.assertEqual( set(s['artifact_name'] for s in dj2), set(('srv2', 'srv3')) )
 
         #And if we deboost VM2 (via an API call, why not!)...
         app.post('/servers/srv2/specification', dict(cores=1, ram=16))
-        dj3 = app.get('/deboost_jobs', dict(past=12)).json
+        dj3 = app.get('/deboost_jobs', dict(past=12*60)).json
         self.assertEqual( set(s['artifact_name'] for s in dj3), set(('srv3',)) )
 
 

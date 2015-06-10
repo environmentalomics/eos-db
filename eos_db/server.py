@@ -673,13 +673,13 @@ def get_time_until_deboost(vm_id, session=None):
 def get_deboost_jobs(past, future, session):
     """ Get a list of pending deboosts.  Deboosts scheduled on un-boosted servers
         will always be filtered out, so there is no need to double-check.
-        :param past: How far back to go.
-        :param future : How far forward to look.
+        :param past: How many minutes far back to go.
+        :param future : How far forward to look, also in minutes.
         :returns: Array of {server_name, server_id, seconds_remaining}
     """
     now = datetime.now()
-    start_time = now - timedelta(hours=past)
-    end_time = now + timedelta(hours=future)
+    start_time = now - timedelta(minutes=past)
+    end_time = now + timedelta(minutes=future)
 
     deboosts = ( session
                  .query(Deboost.deboost_dt, Touch.artifact_id)
@@ -703,8 +703,8 @@ def get_deboost_jobs(past, future, session):
             if server_name in res : del res[server_name]
             continue
 
-        # If this Deboost if further than end_time hours away we don't want it,
-        # but it will invalidate any Deboost we already saw.
+        # If this Deboost if further than end_time minutes away we don't want it,
+        # but it will still invalidate any Deboost we already saw.
         if not d[0] <= end_time:
             if server_name in res : del res[server_name]
             continue
