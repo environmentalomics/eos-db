@@ -232,6 +232,7 @@ class Password(Resource):
 
     def __init__(self, **kwargs):
         # Crypt it
+        print("CRYPT")
         kwargs['password'] = hashpw(kwargs['password'].encode(),
                                     gensalt()).decode()
         super(self.__class__, self).__init__(**kwargs)
@@ -240,6 +241,7 @@ class Password(Resource):
         """Checks if a candidate password matches the stored crypt-ed password.
            Caller should use this rather than attempting manual comparison.
         """
+        print("CHECK")
         # This only works on Py3!
         return self.password.encode() == hashpw(candidate.encode(),
                                                 self.password.encode())

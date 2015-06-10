@@ -215,7 +215,28 @@ class TestUserAPI(unittest.TestCase):
         self.app.post('/servers/by_id/%i/Error' % server_id)
 
         server_info = self.app.get('/servers/fooserver').json
-        self.assertEqual(my_server['state'], 'Error')
+        self.assertEqual(server_info['state'], 'Error')
+
+    def test_boost_server(self):
+        """ Test the boost call.  After Boosting the server should be in the preparing
+            state and the user should have fewer credits.
+        """
+        server_id = self.create_server('boostme', 'testuser')
+        self.add_credit(123, 'testuser')
+
+        self.app.post('/servers/boostme/Boost', params=dict(hours=20, cores=2, ram=40))
+
+        #Check the user
+        user_info = self.app.get('/user').json
+        self.assertEqual(user_info['credits'], 103)
+
+        #Check the server
+        info_expected = dict(boosted="Boosted", boostremaining="20", ram="40 GB", cores="2")
+        server_info = self.app.get('/servers/boostme').json
+        #Remove items I don't want to comper from server_info
+        info_got = {k:server_info[k] for k in server_info if k in info_expected}
+
+        self.assertEqual(info_got, info_expected)
 
     def test_restart_server(self):
         """ Check that a server appears in state 'Restarted' after using the
@@ -233,11 +254,6 @@ class TestUserAPI(unittest.TestCase):
         """
 
     def test_pre_deboost_server(self):
-        """ Check that a server appears in relevant state after using the
-        relevant API call. This also tests the function 'retrieve_servers_in_state'.
-        """
-
-    def test_boost_server(self):
         """ Check that a server appears in relevant state after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """

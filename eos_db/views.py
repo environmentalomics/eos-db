@@ -64,7 +64,6 @@ def home_view(request):
                               "servers": "/servers",  # Return server list
                               "Server details by name": "/servers/{name}",  # Get server details or
                               "Server details by ID": "/servers/by_id/{id}",
-                              "states": "/states/{name}",  # Get list of servers in given state.
                               "Start a server": "/servers/{name}/Starting",
                               "Stop a server": "/servers/{name}/Stopping",
                               "Restart a server": "/servers/{name}/Restarting",
@@ -80,8 +79,10 @@ def home_view(request):
                               "server_Deboost": "/servers/{name}/Deboost",
                               "server_owner": "/servers/{name}/owner",
                               "server_touches": "/servers/{name}/touches",
-                              "server_job_status": "/servers/{name}/job/{job}/status",
-                              "CPU/RAM Specification": "/servers/{name}/specification"
+                              "CPU/RAM Specification": "/servers/{name}/specification",
+                              "All states, and count by state": "/states",
+                              "Servers is state": "/states/{name}",
+                              "Servers needing deboost": "/deboost_jobs",
                               }
                  }
     return call_list
@@ -538,8 +539,7 @@ def deboost_server(request):
     # FIXME: This also needs to look up the other servers currently boosted
     # and return a bad request if there is not enough capacity.
 
-    credit = server.get_deboost_credits(vm_id)
-    server.touch_to_add_credit(actor_id, credit)
+    server.touch_to_add_credit(actor_id, get_deboost_credits(vm_id))
 
     #FIXME - cancel the deboost.  How??
 
@@ -618,16 +618,17 @@ def deboosted_server(request):
     """
     return _set_server_state(request, "Deboosted")
 
-@view_config(request_method="GET", route_name='server_job_status', renderer='json', permission="use")
-def retrieve_job_progress(request):
-    """Check on job progress.
-       FIXME: I don't think this was implemented.
-
-    :param job_id: Internal job ID related to current task.
-    :returns: JSON containing VApp ID and status.
+# Find out what needs de-boosting (agents only)
+@view_config(request_method="GET", route_name='deboosts', renderer='json', permission="act")
+def deboost_jobs(request):
+    """ Calls get_deboost_jobs, which is what the deboost_daemon needs in order to work.
+        Defaults to getting all deboosts that expired within the last hour.
     """
-    newname = server.check_progress(request.matchdict['job'])
-    return newname
+    past = int(request.params.get('past', 1))
+    future = int(request.params.get('future', 0))
+
+    return server.get_deboost_jobs(past, future)
+
 
 @view_config(request_method="GET", route_name='server_touches', renderer='json', permission="use")
 def retrieve_server_touches(request):

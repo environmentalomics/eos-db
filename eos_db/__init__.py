@@ -63,66 +63,6 @@ def add_cookie_callback(event):
 
     event.request.add_response_callback(cookie_callback)
 
-
-def passwordcheck(hardcoded=()):
-    """Generates a callback supplied to HybridAuthenticationPolicy to check
-       the password. The password check is cached to speed up checking when
-       the same user is repeatedly accessing the system, or when the system
-       makes multiple internal password checks for a single request.
-       Any (user,pass,group) triplets passed as hardcoded will be let through
-       without querying the database.
-    """
-
-    # Bcrypt is slow, which is good to deter dictionary attacks, but bad when
-    # the same user is calling multiple API calls, and especially bad for the
-    # tests. This one-item cache should be crude but effective.
-    # It does mean that if you chage a password the old one will still work until
-    # you or someone else logs in.  A workaround is to force a dummy login after
-    # a password change.
-    # FIXME - I think I can sort this out by caching the credentials in the
-    # requast object, which is less hacky.  This cache is nasty.
-    lastpass = [""]
-
-    # Dict-ify the hard-coded users.  Normally this will be
-    # ('agent', 'secret', 'agents') => {'agent' : ('secret': 'agents')}
-    hc = { x[0]: (x[1],x[2]) for x in hardcoded }
-
-    def _passwordcheck(login, password, request):
-        """ Password checking callback. """
-
-        #Do not enable these unless you need to test password stuff, as
-        #user details will be printed to STDOUT
-#         print("Checking %s:%s for %s" % (login, password, request))
-#         print("Lastpass is " + lastpass[0])
-#         print("Hard-coded users are " + str(tuple(hc.keys())) )
-
-        if login in hc:
-            if hc[login][0] == password:
-                return ['group:' + hc[login][1]]
-            else:
-                return None
-
-        elif (str(lastpass[0]) == login + ":" + password or \
-            server.check_password(login, password)):
-
-            user_group = server.get_user_group(login)
-
-            log.debug("Found user group " + user_group)
-
-            if user_group in ("administrators", "users", "agents"):
-                # Remember that this worked
-                lastpass[0] = login + ":" + password
-
-                return ['group:' + user_group]
-            else:
-                lastpass[0] = ""
-                return None
-        else:
-            lastpass[0] = ""
-            return None
-
-    return _passwordcheck
-
 def get_secret(settings, secret):
     """ Given the global settings and a name of a secret, determine the secret.
         The secrets we need to function are the 'authtkt' secret which does not need
@@ -161,17 +101,16 @@ def get_secret(settings, secret):
 
 
 #FIXME? main takes global_config as an argument here but why?
-# Also - Is this called just once per initialisation?  Ie. can I generate my
-# token secret here?
 def main(global_config, **settings):
     """ Set routes, authentication policies, and add callbacks to modify
     responses."""
 
     agent_spec = [ ('agent', get_secret(settings, 'agent'), 'agents') ]
 
-    hap = HybridAuthenticationPolicy(check=passwordcheck(hardcoded=agent_spec),
+    hap = HybridAuthenticationPolicy(hardcoded=agent_spec,
                                      secret=get_secret(settings, "authtkt"),
                                      realm="eos_db")
+
     config = Configurator(settings=settings,
                           authentication_policy=hap,
                           root_factory='eos_db.views.PermissionsMap')
@@ -232,10 +171,10 @@ def main(global_config, **settings):
     config.add_route('server_by_id', '/servers/by_id/{id}')
 
     # Server state-related calls.
-
-    config.add_route('states', '/states')       # Get count of servers in each state
+    config.add_route('states', '/states')  # Get summary count of servers in each state
     config.add_route('state',  '/states/{name}') # Get list of servers in
                                                  # the given state.
+    config.add_route('deboosts', '/deboost_jobs') # Get list of servers wanting deboost
 
     #Define PUT calls to put the server into various states.  Each call is backed
     #by a separate function in views.py, and mostly these just add a touch, but
@@ -256,9 +195,6 @@ def main(global_config, **settings):
                      '/servers/{name}/owner')  # Get or put server ownership
     config.add_route('server_touches',
                      '/servers/{name}/touches') # Get server touches.
-    config.add_route('server_job_status',
-                     '/servers/{name}/job/{job}/status')  # Get server touches
-
 
     config.scan()
     return config.make_wsgi_app()

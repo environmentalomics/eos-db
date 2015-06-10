@@ -295,12 +295,14 @@ def return_artifact_details(artifact_id, artifact_name=None, artifact_uuid=None,
     create_dt = _get_artifact_creation_date(artifact_id, session=session)
     state = check_state(artifact_id, session=session)
     boosted = _get_server_boost_status(artifact_id)
-    try:
-        boostremaining = get_hours_until_deboost(artifact_id, session=session)
-        if boostremaining < 0:
-            boostremaining = "N/A"
-    except:
-        boostremaining = "N/A"
+
+    time_for_deboost = get_time_until_deboost(artifact_id, session=session)
+    boostremaining = time_for_deboost[2] or "N/A"
+    # Get deboost time as UNIX seconds-since-epoch
+    # Any browser will be able to render this as local time by using:
+    #  var d = new Date(0) ;  d.setUTCSeconds(deboost_time)
+    deboost_time = time_for_deboost[0].strftime("%s") if time_for_deboost[0] else 0
+
     try:
         cores, ram = get_latest_specification(artifact_id, session=session)
         ram = str(ram) + " GB"
@@ -322,7 +324,8 @@ def return_artifact_details(artifact_id, artifact_name=None, artifact_uuid=None,
             "boosted": boosted,
             "cores": cores,
             "ram": ram,
-            "boostremaining": boostremaining
+            "boostremaining": boostremaining,
+            "deboost_time": deboost_time
             })
 
 def set_deboost(hours, touch_id):
@@ -401,7 +404,7 @@ def get_user_id_from_name(name, session):
         raise KeyError("No such user")
     return user_id[0]
 
-def _get_server_boost_status(artifact_id):
+def _get_server_boost_status(artifact_id, session=None):
     """ Return the boost status (either "Boosted" or "Unboosted" of the given
     artifact by ID.
 
@@ -413,7 +416,7 @@ def _get_server_boost_status(artifact_id):
     # FIXME: Ideally this should really return a boolean to indicate whether a
     # machine is boosted or not.
     try:
-        cores, ram = get_latest_specification(artifact_id)
+        cores, ram = get_latest_specification(artifact_id, session=session)
     except:
         cores, ram = 0, 0
     # FIXME - remove hard-coding of 40
@@ -429,7 +432,7 @@ def get_deboost_credits(artifact_id, session):
     :param artifact_id: The artifact in question by ID.
     :returns: Number of credits to be refunded..
     """
-    hours = get_hours_until_deboost(artifact_id, session=session)
+    hours = get_time_until_deboost(artifact_id, session=session)[1] // 3600
     cores, ram = get_latest_specification(artifact_id, session=session)
     multiplier = 0
     if cores == 2:
@@ -438,9 +441,12 @@ def get_deboost_credits(artifact_id, session):
         multiplier = 3
     if cores == 16:
         multiplier = 12
-    return multiplier * hours
 
-    return deboost_credits
+    #Don't end up debiting credits if a deboost is processed late and hours goes negative!
+    if hours > 0:
+        return multiplier * hours
+    else:
+        return 0
 
 @with_session
 def list_servers_by_state(session):
@@ -572,14 +578,6 @@ def check_and_remove_credits(actor_id, ram, cores, hours):
     else:
         return None
 
-def check_progress(job_id):
-    """Looks for the most recent status value in the in-memory progress table.
-
-    :param job_id: VM job ID associated with this progress request.
-    :returns: Progress value.
-    """
-    return 0
-
 def touch_to_add_password(actor_id, password):
     """Sets the password for a user.
 
@@ -631,9 +629,11 @@ def get_latest_specification(vm_id, session):
               .first() )
     return state
 
+## Functions that query when a server needs to de-boost.
+
 @with_session
-def get_latest_deboost_dt(vm_id, session):
-    """ Return the most recent / current deboost date of a VM.
+def _get_latest_deboost_dt(vm_id, session):
+    """Internal function. Return the most recent / current deboost date of a VM.
 
     :param vm_id: A valid VM id.
     :returns: String containing most recent deboost date.
@@ -648,12 +648,73 @@ def get_latest_deboost_dt(vm_id, session):
     return state
 
 #No with_session decorator needed, but a sesh might be passed through.
-def get_hours_until_deboost(vm_id, session=None):
-    """ Get the number of hours until a VM is due to deboost. """
+def get_time_until_deboost(vm_id, session=None):
+    """ Get the time of hours until a VM is due to deboost.
+        We return a triplet: [ deboost_time, seconds_until_deboost, display_value ]
+    """
     now = datetime.now()
-    deboost_dt = get_latest_deboost_dt(vm_id,session=session)[0]
-    d = deboost_dt - now
-    return int(d.total_seconds() / 3600)
+    try:
+        deboost_dt = _get_latest_deboost_dt(vm_id,session=session)[0]
+        delta = deboost_dt - now
+        #Work out what to show the user...
+        display_value = None
+        if delta.days > 0:
+            display_value = "%i days, %02i hrs" % (delta.days, delta.seconds // 3600)
+        elif delta.days == 0:
+            display_value = "%02i hrs, %02i min" % divmod(delta.seconds, 3600)
+
+        return (deboost_dt, delta.total_seconds(), display_value)
+    except:
+        return (None, None, None)
+
+
+@with_session
+def get_deboost_jobs(past, future, session):
+    """ Get a list of pending deboosts.  Deboosts scheduled on un-boosted servers
+        will always be filtered out, so there is no need to double-check.
+        :param past: How far back to go.
+        :param future : How far forward to look.
+        :returns: Array of {server_name, server_id, seconds_remaining}
+    """
+    now = datetime.now()
+    start_time = now - timedelta(hours=past)
+    end_time = now + timedelta(hours=future)
+
+    deboosts = ( session
+                 .query(Deboost.deboost_dt, Touch.artifact_id)
+                 .filter(Deboost.deboost_dt > start_time)
+                 .filter(Deboost.touch_id == Touch.id)
+                 .filter(Touch.touch_dt != None)
+                 .order_by(Touch.touch_dt.asc()) )
+
+    #Collect tasks in a dict by server_name, allowing new touches to overwite
+    #old ones.
+    res = {}
+
+    for d in deboosts:
+        server_id = d[1]
+        server_name = get_server_name_from_id(server_id)
+
+        # It's possible the touch is attached to a server_id that was overwitten,
+        # but then either the real server is un-boosted or else it will have a later
+        # deboost set anyway.  But that's why we need the 'del' here...
+        if _get_server_boost_status(server_id) != 'Boosted':
+            if server_name in res : del res[server_name]
+            continue
+
+        # If this Deboost if further than end_time hours away we don't want it,
+        # but it will invalidate any Deboost we already saw.
+        if not d[0] <= end_time:
+            if server_name in res : del res[server_name]
+            continue
+
+        res[server_name] = d
+
+    #And return an array of triples as promised
+    return [ dict(artifact_name=n,
+                  artifact_id=i[1],
+                  boost_remain=(i[0] - now).total_seconds() )
+             for n,i in res.items() ]
 
 @with_session
 def get_previous_specification(vm_id, index=1, session=None):
