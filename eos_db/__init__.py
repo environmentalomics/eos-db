@@ -4,14 +4,12 @@ Contains routing for EOS-DB API, and callbacks for response modification."""
 
 from pyramid.config import Configurator
 from pyramid.events import NewRequest, NewResponse
-from pyramid.security import authenticated_userid, remember
 
 import logging
 import sys, os
-import warnings
 
 from eos_db import server
-from eos_db.auth import HybridAuthenticationPolicy
+from eos_db.auth import HybridAuthenticationPolicy, add_cookie_callback
 from pyramid.httpexceptions import HTTPUnauthorized
 
 # FIXME - when deployed we'll need to call from eoscloud.nerc.ac.uk, but that should be covered
@@ -44,24 +42,6 @@ def add_cors_callback(event):
             response.headers['Access-Control-Allow-Credentials'] = 'false'
 
     event.request.add_response_callback(cors_headers)
-
-def add_cookie_callback(event):
-    """ Add a cookie containing a security token to all response headers from
-    eos_db."""
-
-    #Suppress this warning which I already know about.  Note this sets the global
-    #warnings filter so it's something of a nasty side-effect.
-    warnings.filterwarnings("ignore", r'Behavior of MultiDict\.update\(\) has changed')
-    def cookie_callback(request, response):
-        """ Cookie callback. """
-
-        if response.status[0] == '2':
-            #print(remember(request, request.authenticated_userid))
-            response.headers.update(remember(request,
-                                             request.authenticated_userid))
-            #print(response.headers)
-
-    event.request.add_response_callback(cookie_callback)
 
 def get_secret(settings, secret):
     """ Given the global settings and a name of a secret, determine the secret.

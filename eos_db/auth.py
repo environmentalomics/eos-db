@@ -13,11 +13,32 @@
 from pyramid.authentication import (BasicAuthAuthenticationPolicy,
                                     AuthTktAuthenticationPolicy)
 from pyramid.httpexceptions import HTTPUnauthorized, HTTPRequestTimeout
+from pyramid.security import remember
 
 from eos_db import server
 
+import warnings
 import logging
 log = logging.getLogger(__name__)
+
+
+def add_cookie_callback(event):
+    """ Add a cookie containing a security token to all response headers.
+        This should be added to the configurator as a subscriber in addition to
+        setting the authentication_policy.
+    """
+
+    #Suppress this warning which I already know about.  Note this sets the global
+    #warnings filter so it's something of a nasty side-effect.
+    warnings.filterwarnings("ignore", r'Behavior of MultiDict\.update\(\) has changed')
+    def cookie_callback(request, response):
+        """ Cookie callback. """
+
+        if response.status[0] == '2':
+             response.headers.update(remember(request,
+                                              request.authenticated_userid))
+
+    event.request.add_response_callback(cookie_callback)
 
 class HybridAuthenticationPolicy():
     """ HybridAuthenticationPolicy. Called in the same way as other auth
@@ -60,8 +81,6 @@ class HybridAuthenticationPolicy():
             The mapping of groups to actual capabilities is stored in views.PermissionsMap
             """
 
-        print("GETGROUP")
-
         group = server.get_user_group(username)
         if group:
             return ["group:" + str(group)]
@@ -90,9 +109,8 @@ class HybridAuthenticationPolicy():
             not exist, then check the basic auth header, and return that, if it
             exists.
         """
-        print("UNAUTHENTICATED_USERID")
         #Allow forcing the auth_tkt cookie.  Helpful for JS calls.
-        #FIXME - move this to a callback so it only happens once.
+        #Maybe move this to a callback so it only ever happens once?
         if request.headers.get('auth_tkt'):
             request.cookies['auth_tkt'] = request.headers['auth_tkt']
 
@@ -104,21 +122,30 @@ class HybridAuthenticationPolicy():
         """ Return the Auth Ticket user ID if that exists. If not, then check
             for a user ID in Basic Auth.
         """
-        print("AUTHENTICATED_USERID")
+        try:
+            return request.cached_authenticated_userid
+        except:
+            #Proceed to look-up then
+            pass
 
         #Allow forcing the auth_tkt cookie.
         if request.headers.get('auth_tkt'):
             request.cookies['auth_tkt'] = request.headers['auth_tkt']
 
-        return ( self.tap.unauthenticated_userid(request) or
-                 self.bap.unauthenticated_userid(request) )
+        request.cached_authenticated_userid = ( self.tap.unauthenticated_userid(request) or
+                                                self.bap.unauthenticated_userid(request) )
+        return request.cached_authenticated_userid
 
     def effective_principals(self, request):
         """ Returns the list of effective principles from the auth policy
         under which the user is currently authenticated. Auth ticket takes
         precedence. """
-        print("EFFECTIVE_PRINCIPALS")
-        #print(request.effective_principals.__repr__())
+
+        try:
+            return request.cached_effective_principals
+        except:
+            #Proceed to look-up then
+            pass
 
         #Allow forcing the auth_tkt cookie.
         if request.headers.get('auth_tkt'):
@@ -126,9 +153,11 @@ class HybridAuthenticationPolicy():
 
         userid = self.tap.authenticated_userid(request)
         if userid:
-            return self.tap.effective_principals(request)
+            request.cached_effective_principals = self.tap.effective_principals(request)
         else:
-            return self.bap.effective_principals(request)
+            request.cached_effective_principals = self.bap.effective_principals(request)
+
+        return request.cached_effective_principals
 
     def remember(self, request, principal, **kw):
         """Causes the session info to be remembered by passing the appropriate

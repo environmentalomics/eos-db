@@ -649,8 +649,9 @@ def _get_latest_deboost_dt(vm_id, session):
 
 #No with_session decorator needed, but a sesh might be passed through.
 def get_time_until_deboost(vm_id, session=None):
-    """ Get the time of hours until a VM is due to deboost.
-        We return a triplet: [ deboost_time, seconds_until_deboost, display_value ]
+    """ Get the time when until a VM is due to deboost, invarious formats.
+        We return a triplet:
+          [ (datetime)deboost_time, (int)seconds_until_deboost, (str)display_value ]
     """
     now = datetime.now()
     try:
@@ -661,7 +662,7 @@ def get_time_until_deboost(vm_id, session=None):
         if delta.days > 0:
             display_value = "%i days, %02i hrs" % (delta.days, delta.seconds // 3600)
         elif delta.days == 0:
-            display_value = "%02i hrs, %02i min" % divmod(delta.seconds, 3600)
+            display_value = "%02i hrs, %02i min" % divmod(delta.seconds // 60, 60)
 
         return (deboost_dt, delta.total_seconds(), display_value)
     except:
@@ -782,10 +783,8 @@ def check_password(username, password, session):
                     .order_by(Touch.id.desc())
                     .first())
     if our_password is None:
-        #print ("No password for user")
         return False
     else:
-        #print ("Checking password " + password)
         return our_password.check(password)
 
 def _create_credit(touch_id, credit):

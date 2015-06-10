@@ -203,20 +203,6 @@ def create_my_password(request):
     #FIXME2 - also should this not be a POST?
     return newname
 
-@view_config(request_method="GET", route_name='user_password', renderer='json', permission="use")
-def retrieve_user_password(request):
-    """ Standard login method. Basicauth is used for authorisation, so this
-    just checks that the user whose details we are requesting matches the
-    details passed from BasicAuth. """
-
-    # FIXME (Tim) - this makes no sense.  Return True if the user is logged in as the named user?
-
-    username = request.matchdict['name']
-    actor_id = server.get_user_id_from_name(username)
-    bapauth = request.authenticated_userid
-    print (bapauth)
-    return True if (bapauth == username) else None
-
 @view_config(request_method="GET", route_name='user_touches', renderer='json', permission="use")
 def retrieve_user_touches(request):
     # FIXME - Not implemented.
@@ -286,10 +272,8 @@ def retrieve_servers(request):
     """
     Lists all artifacts related to the current user.
     """
-    #print ("Servers for user: " + request.authenticated_userid)
     user_id = server.get_user_id_from_name(request.authenticated_userid)
     server_list = server.list_artifacts_for_user(user_id)
-    #print (server_list)
     return list(server_list)
 
 @view_config(request_method="GET", route_name='states', renderer='json', permission="use")
