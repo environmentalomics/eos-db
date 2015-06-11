@@ -448,19 +448,21 @@ def prepare_server(request):
     """
     return _set_server_state(request, "Preparing")
 
-@view_config(request_method="GET", route_name='server_state', renderer='json', permission="use")
+@view_config(request_method="GET", routes=['server_state', 'server_by_id_state'],
+             renderer='json', permission="use")
 def server_state(request):
     """Get the status for a server.  Anyone can request this,
 
     :param name: Name of VApp which we want to stop.
     :returns: The state, by name.
     """
-    id = server.get_server_id_from_name(request.matchdict['name'])
-    state_name = server.check_state(id)
-    return state_name
+    vm_id, actor_id = _resolve_vm(request)
+    return server.check_state(vm_id)
 
+# We should not need to use this directly.  All server should enter this
+# state by a call to /servers/foo/Deboost
 @view_config(request_method="POST", routes=['server_Pre_Deboosting', 'server_by_id_Pre_Deboosting'],
-             renderer='json', permission="use")
+             renderer='json', permission="administer")
 def pre_deboost_server(request):
     """Put a server into the "pre-deboosting" status.
 

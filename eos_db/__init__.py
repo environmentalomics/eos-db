@@ -169,12 +169,10 @@ def main(global_config, **settings):
         config.add_route('server_' + action      , '/servers/{name}/' + action    )
         config.add_route('server_by_id_' + action, '/servers/by_id/{id}/' + action)
 
-    config.add_route('server_state',
-                     '/servers/{name}/state') # Allows you to get the server state
-    config.add_route('server_owner',
-                     '/servers/{name}/owner')  # Get or put server ownership
-    config.add_route('server_touches',
-                     '/servers/{name}/touches') # Get server touches.
+    #And also for state, owner, touches...
+    for action in ('state', 'owner', 'touches'):
+        config.add_route('server_' + action      , '/servers/{name}/' + action    )
+        config.add_route('server_by_id_' + action, '/servers/by_id/{id}/' + action)
 
     config.scan()
     return config.make_wsgi_app()
