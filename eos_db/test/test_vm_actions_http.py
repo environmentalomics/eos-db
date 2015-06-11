@@ -9,18 +9,18 @@ from webtest import TestApp
 from pyramid.paster import get_app
 from http.cookiejar import DefaultCookiePolicy
 
-# Hmmmmm
+# These states should be settable without any side-effects.
 STATES_TO_TEST = [
             'Starting',
             'Stopping',
             'Restarting',
-            'Pre_Deboosting',
             'Pre_Deboosted',
+            'Deboosting',
             'Started',
             'Stopped',
-            'Preparing',
-            'Prepared', ]
-#             'Boosting']
+            'Prepared',
+            'Boosting',
+            ]
 
 # Depend on test.ini in the same dir as this file.
 test_ini = os.path.join(os.path.dirname(__file__), 'test.ini')
@@ -82,13 +82,14 @@ class TestVMActionsHTTP(unittest.TestCase):
                                 {'hostname': 'testserver'})
 
         # Get server ownership - !! Not implemented
+        # FIXME
 #
 #         response = self.app.get('/servers/testserver/owner',
 #                                 {'artifact_id': 'testserver'})
 
     """ Server State-Change Functions. """
 
-    def test_server_states(self):  # FIX
+    def test_server_states(self):
         """ Check that a server appears in various states after using the
         relevant API call. This also tests the function 'retrieve_servers_in_state'.
         """
@@ -101,7 +102,7 @@ class TestVMActionsHTTP(unittest.TestCase):
                             {'artifact_id': 'testserver'})
             return response.json
 
-        #This should fail because not all the states are valid.
+        #All the states listed should simply add a touch and succeed without drama.
         for state in STATES_TO_TEST:
             res = self.app.post('/servers/testserver/' + state)
             #print("Push result = " + str(res))
@@ -175,6 +176,7 @@ class TestVMActionsHTTP(unittest.TestCase):
 
     def test_retrieve_servers_by_state(self):
         """ The agents need to find out about servers to be acted on.
+            Test for states/XXX
         """
         app = self.app
         self.create_server("testserver1")
@@ -183,9 +185,8 @@ class TestVMActionsHTTP(unittest.TestCase):
         app.post('/servers/testserver1/Stopping')
         app.post('/servers/testserver2/Stopping')
 
-        res = app.get('/states/Stopping')
-
-        self.assertEqual(res.json,
+        res1 = app.get('/states/Stopping')
+        self.assertEqual(res1.json,
                 [{"artifact_id":1, "artifact_uuid":"testserver1", "artifact_name":"testserver1"},
                  {"artifact_id":2, "artifact_uuid":"testserver2", "artifact_name":"testserver2"}]
                 )
@@ -197,7 +198,8 @@ class TestVMActionsHTTP(unittest.TestCase):
         app.post('/servers/testserver3/Starting')
         app.post('/servers/testserver2/Stopping')
 
-        self.assertEqual(res.json,
+        res2 = app.get('/states/Stopping')
+        self.assertEqual(res2.json,
                 [{"artifact_id":1, "artifact_uuid":"testserver1", "artifact_name":"testserver1"},
                  {"artifact_id":2, "artifact_uuid":"testserver2", "artifact_name":"testserver2"}]
                 )
@@ -208,7 +210,7 @@ class TestVMActionsHTTP(unittest.TestCase):
     def test_retrieve_server_touches(self):
         """ Not currently implemented. """
 
-    def test_retrieve_by_state(self):
+    def test_retrieve_state_summary(self):
         """ Test for /states
         """
         app = self.app

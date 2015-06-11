@@ -289,19 +289,25 @@ def list_artifacts_for_user(user_id, session):
 
 @with_session
 def return_artifact_details(artifact_id, artifact_name=None, artifact_uuid=None, session=None):
-
-    """ Return basic information about each server. """
+    """ Return basic information about each server, for display.
+    """
     change_dt = _get_most_recent_change(artifact_id, session=session)
     create_dt = _get_artifact_creation_date(artifact_id, session=session)
     state = check_state(artifact_id, session=session)
     boosted = _get_server_boost_status(artifact_id)
 
-    time_for_deboost = get_time_until_deboost(artifact_id, session=session)
-    boostremaining = time_for_deboost[2] or "N/A"
-    # Get deboost time as UNIX seconds-since-epoch
-    # Any browser will be able to render this as local time by using:
-    #  var d = new Date(0) ;  d.setUTCSeconds(deboost_time)
-    deboost_time = time_for_deboost[0].strftime("%s") if time_for_deboost[0] else 0
+    boostremaining = "N/A"
+    deboost_time = 0
+
+    #Because get_time_until_deboost() might report a deboost time for an un-boosted
+    #server if it was manually deboosted...
+    if boosted == "Boosted":
+        time_for_deboost = get_time_until_deboost(artifact_id, session=session)
+        boostremaining = time_for_deboost[2] or "Not set"
+        # Get deboost time as UNIX seconds-since-epoch
+        # Any browser will be able to render this as local time by using:
+        #  var d = new Date(0) ;  d.setUTCSeconds(deboost_time)
+        deboost_time = time_for_deboost[0].strftime("%s") if time_for_deboost[0] else 0
 
     try:
         cores, ram = get_latest_specification(artifact_id, session=session)
@@ -432,7 +438,13 @@ def get_deboost_credits(artifact_id, session):
     :param artifact_id: The artifact in question by ID.
     :returns: Number of credits to be refunded..
     """
-    hours = get_time_until_deboost(artifact_id, session=session)[1] // 3600
+    hours = (get_time_until_deboost(artifact_id, session=session)[1] or 0) // 3600
+
+    #Don't end up debiting credits if a deboost is processed late and hours goes negative!
+    #Also, this prevents get_latest_specification potentially throwing an exception we
+    #don't care about.
+    if not hours > 0: return 0
+
     cores, ram = get_latest_specification(artifact_id, session=session)
     multiplier = 0
     if cores == 2:
@@ -442,11 +454,7 @@ def get_deboost_credits(artifact_id, session):
     if cores == 16:
         multiplier = 12
 
-    #Don't end up debiting credits if a deboost is processed late and hours goes negative!
-    if hours > 0:
-        return multiplier * hours
-    else:
-        return 0
+    return multiplier * hours
 
 @with_session
 def list_servers_by_state(session):
@@ -615,7 +623,8 @@ def touch_to_add_specification(vm_id, cores, ram):
 
 @with_session
 def get_latest_specification(vm_id, session):
-    """ Return the most recent / current state of a VM.
+    """ Return the most recent / current state of a VM.  Equivalent to
+        get_previous_specification(index=0).
 
     :param vm_id: A valid VM id.
     :returns: String containing current status.
@@ -663,6 +672,10 @@ def get_time_until_deboost(vm_id, session=None):
             display_value = "%i days, %02i hrs" % (delta.days, delta.seconds // 3600)
         elif delta.days == 0:
             display_value = "%02i hrs, %02i min" % divmod(delta.seconds // 60, 60)
+        else:
+            #Too fiddly, and pointless, displaying a negative delta as human-readble.
+            #The caller can still look at the first 2 values to inspect expired boosts.
+            display_value = "Expired"
 
         return (deboost_dt, delta.total_seconds(), display_value)
     except:
@@ -719,7 +732,8 @@ def get_deboost_jobs(past, future, session):
 
 @with_session
 def get_previous_specification(vm_id, index=1, session=None):
-    """
+    """Get the previous machine spec, or indeed the last-but-one or whatever
+       index you like.
     """
     state = ( session
               .query(Specification.cores, Specification.ram)

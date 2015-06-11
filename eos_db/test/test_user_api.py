@@ -1,5 +1,6 @@
 """Tests for DB API behaviour when logged in as user.
 
+   Need to sort out which tests live here and which in test_vm_actions_http
 """
 import os
 import unittest
@@ -217,14 +218,16 @@ class TestUserAPI(unittest.TestCase):
         server_info = self.app.get('/servers/fooserver').json
         self.assertEqual(server_info['state'], 'Error')
 
-    def test_boost_server(self):
-        """ Test the boost call.  After Boosting the server should be in the preparing
-            state and the user should have fewer credits.
+    def test_boost_deboost_server(self):
+        """ Test the boost call, which is done by putting the server into /Preparing.
+            After this the server should be in the Preparing state and the user should
+            have fewer credits.
+            Also test the deboost.
         """
         server_id = self.create_server('boostme', 'testuser')
         self.add_credit(123, 'testuser')
 
-        self.app.post('/servers/boostme/Boost', params=dict(hours=20, cores=2, ram=40))
+        self.app.post('/servers/boostme/Preparing', params=dict(hours=20, cores=2, ram=40))
 
         #Check the user
         user_info = self.app.get('/user').json
@@ -232,6 +235,21 @@ class TestUserAPI(unittest.TestCase):
 
         #Check the server
         info_expected = dict(boosted="Boosted", boostremaining="19 hrs, 59 min", ram="40 GB", cores="2")
+        server_info = self.app.get('/servers/boostme').json
+        #Remove items I don't want to compare from server_info
+        info_got = {k:str(server_info[k]) for k in server_info if k in info_expected}
+
+        self.assertEqual(info_got, info_expected)
+
+        #Deboost and check again
+        self.app.post('/servers/boostme/Pre_Deboosting')
+
+        #Check the user - we should be down 1 credit.
+        user_info = self.app.get('/user').json
+        self.assertEqual(user_info['credits'], 122)
+
+        #Check the server once more.
+        info_expected = dict(boosted="Unboosted", boostremaining="N/A", ram="16 GB", cores="1")
         server_info = self.app.get('/servers/boostme').json
         #Remove items I don't want to compare from server_info
         info_got = {k:str(server_info[k]) for k in server_info if k in info_expected}

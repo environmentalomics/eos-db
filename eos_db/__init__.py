@@ -158,19 +158,14 @@ def main(global_config, **settings):
 
     #Define PUT calls to put the server into various states.  Each call is backed
     #by a separate function in views.py, and mostly these just add a touch, but
-    #they may implement custom functionality, for example to chack and deduct
+    #they may implement custom functionality, for example to check and deduct
     #credit when boosting, or to limit who can change to certain states.
     for state in server.get_state_list():
-        config.add_route('server_' + state,   '/servers/{name}/' + state)
+        config.add_route('server_' + state,         '/servers/{name}/' + state)
         config.add_route('server_by_id_' + state,   '/servers/by_id/{id}/' + state)
 
-    #Call to boost/deboost the server and get/set specification.
-    for action in ('Boost', 'Deboost', 'specification'):
-        config.add_route('server_' + action      , '/servers/{name}/' + action    )
-        config.add_route('server_by_id_' + action, '/servers/by_id/{id}/' + action)
-
-    #And also for state, owner, touches...
-    for action in ('state', 'owner', 'touches'):
+    #Call to state, owner, touches and get/set specification.
+    for action in ('specification', 'state', 'owner', 'touches'):
         config.add_route('server_' + action      , '/servers/{name}/' + action    )
         config.add_route('server_by_id_' + action, '/servers/by_id/{id}/' + action)
 

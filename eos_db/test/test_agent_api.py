@@ -213,10 +213,10 @@ class TestAgentAPI(unittest.TestCase):
             server.touch_to_add_specification(vm_id, 2, 40)
             server.touch_to_add_deboost(vm_id, hours)
 
-        #Negative time deboost should be OK
+        #Negative time deboost should be OK, and should show as Expired
         #Confirm the negative-time deboost worked (eternal + internal view)
         server_1_info = app.get('/servers/srv1').json
-        self.assertEqual(server_1_info['boostremaining'], "N/A")
+        self.assertEqual(server_1_info['boostremaining'], "Expired")
 
         server_1_tud = server.get_time_until_deboost(server_1_info['artifact_id'])
         self.assertTrue(server_1_tud[1] < (-13 * 60 * 60))

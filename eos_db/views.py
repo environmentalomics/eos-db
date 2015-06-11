@@ -67,16 +67,13 @@ def home_view(request):
                               "Start a server": "/servers/{name}/Starting",
                               "Stop a server": "/servers/{name}/Stopping",
                               "Restart a server": "/servers/{name}/Restarting",
-                              "server_Pre_Deboost": "/servers/{name}/pre_deboosting",
+                              "De-Boost a server": "/servers/{name}/pre_deboosting",
                               "server_Pre_Deboosted": "/servers/{name}/Pre_deboosted",
                               "server_Deboost": "/servers/{name}/deboosting",
-                              "server_Deboosted": "/servers/{name}/Deboosted",
                               "server_Started": "/servers/{name}/Started",
                               "server_Stopped": "/servers/{name}/Stopped",
-                              "server_Preparing": "/servers/{name}/preparing",
+                              "Boost a server": "/servers/{name}/preparing",
                               "server_Prepared": "/servers/{name}/prepared",
-                              "server_Boost": "/servers/{name}/Boost",
-                              "server_Deboost": "/servers/{name}/Deboost",
                               "server_owner": "/servers/{name}/owner",
                               "server_touches": "/servers/{name}/touches",
                               "CPU/RAM Specification": "/servers/{name}/specification",
@@ -107,8 +104,7 @@ def options2(request):
     return resp
 
 @view_config(request_method="OPTIONS", routes=["server_" + x for x in server.get_state_list()])
-@view_config(request_method="OPTIONS", routes=["server_Boost", "server_Deboost"])
-@view_config(request_method="OPTIONS", routes=["server_by_id_Boost", "server_by_id_Deboost"])
+@view_config(request_method="OPTIONS", routes=["server_by_id_" + x for x in server.get_state_list()])
 def options3(request):
     resp = Response(None)
     resp.headers['Allow'] = "HEAD,POST,OPTIONS"
@@ -389,65 +385,6 @@ def _resolve_vm(request):
     else:
         raise HTTPUnauthorized()
 
-def _set_server_state(request, target_state):
-    """Basic function for putting a server into some state, for basic state-change calls."""
-    vm_id, actor_id = _resolve_vm(request)
-    return server.touch_to_state(actor_id, vm_id, target_state)
-
-
-@view_config(request_method="POST", routes=['server_Starting', 'server_by_id_Starting'],
-             renderer='json', permission="use")
-def start_server(request):
-    """Put a server into the "Starting" status.
-
-    :param name: Name of VApp which we want to start.
-    :returns: JSON containing VApp ID and job ID for progress calls.
-    """
-    #FIXME - note that Ben never implemented the job concept, and this is currently just
-    #returning the touch id.  Same for all similar functions.
-    return _set_server_state(request, "Starting")
-
-@view_config(request_method="POST", routes=['server_Starting_Boosted', 'server_by_id_Starting_Boosted'],
-             renderer='json', permission="use")
-def start_boosted_server(request):
-    """Put a server into the "Starting_Boosted" status.
-
-    :param name: Name of VApp which we want to start.
-    :returns: JSON containing VApp ID and job ID for progress calls.
-    """
-    return _set_server_state(request, "Starting_Boosted")
-
-@view_config(request_method="POST", routes=['server_Restarting', 'server_by_id_Restarting'],
-             renderer='json', permission="use")
-def restart_server(request):
-    """Put a server into the "Restarting" status.
-
-    :param vm_id: ID of VApp which we want to start.
-    :returns: JSON containing VApp ID and job ID for progress calls.
-    """
-    return _set_server_state(request, "Restarting")
-
-@view_config(request_method="POST", routes=['server_Stopping', 'server_by_id_Stopping'],
-             renderer='json', permission="use")
-def stop_server(request):
-    """Put a server into the "Stopping" status.
-
-    :param vm_id: ID of VApp which we want to stop.
-    :returns: JSON containing VApp ID and job ID for progress calls.
-    """
-    return _set_server_state(request, "Stopping")
-
-@view_config(request_method="POST", routes=['server_Preparing', 'server_by_id_Preparing'],
-             renderer='json', permission="act")
-def prepare_server(request):
-    """Put a server into the "Preparing" status.
-       A regular user can only do this indirectly, by calling server/Boost
-
-    :param vm_id: ID of VApp which we want to stop.
-    :returns: JSON containing VApp ID and job ID for progress calls.
-    """
-    return _set_server_state(request, "Preparing")
-
 @view_config(request_method="GET", routes=['server_state', 'server_by_id_state'],
              renderer='json', permission="use")
 def server_state(request):
@@ -459,19 +396,44 @@ def server_state(request):
     vm_id, actor_id = _resolve_vm(request)
     return server.check_state(vm_id)
 
-# We should not need to use this directly.  All server should enter this
-# state by a call to /servers/foo/Deboost
-@view_config(request_method="POST", routes=['server_Pre_Deboosting', 'server_by_id_Pre_Deboosting'],
-             renderer='json', permission="administer")
-def pre_deboost_server(request):
-    """Put a server into the "pre-deboosting" status.
+def _set_server_state(request, target_state):
+    """Basic function for putting a server into some state, for basic state-change calls."""
+    vm_id, actor_id = _resolve_vm(request)
+    return {"vm_id": vm_id,
+            "touch_id": server.touch_to_state(actor_id, vm_id, target_state)}
 
-    :param vm_id: ID of VApp which we want to stop.
-    :returns: JSON containing VApp ID and job ID for progress calls.
-    """
-    return _set_server_state(request, "Pre_Deboosting")
+#Pyramid is not designed to allow you to add view configurations programatically.
+#But in Python all things are possible.  Here is a way to set up view configurations in a loop.
+#This will declare the functions "set_server_to_Boosting", etc...
+#And bind them to the routes "server_Boosting" and "server_by_id_Boosting"
 
-@view_config(request_method="POST", routes=['server_Boost', 'server_by_id_Boost'],
+### Here are the states that can only be set by agents...
+for state in ['Stopped', 'Started', 'Prepared', 'Pre_Deboosted',
+              'Boosting', 'Deboosting', 'Starting_Boosted' ]:
+     funcname = 'set_server_to_' + state
+     globals()[funcname] = lambda request, state=state: _set_server_state(request, state)
+     globals()[funcname] = view_config( request_method="POST",
+                                        routes=['server_' + state, 'server_by_id_' + state],
+                                        renderer='json',
+                                        permission="act"
+                                      )( globals()[funcname] )
+     globals()[funcname].__name__ = funcname
+     globals()[funcname].__qualname__ = funcname
+
+### States that any user can put their server into...
+for state in ['Starting', 'Stopping', 'Restarting', 'Error']:
+     funcname = 'set_server_to_' + state
+     globals()[funcname] = lambda request, state=state: _set_server_state(request, state)
+     globals()[funcname] = view_config( request_method="POST",
+                                        routes=['server_' + state, 'server_by_id_' + state],
+                                        renderer='json',
+                                        permission="use"
+                                      )( globals()[funcname] )
+     globals()[funcname].__name__ = funcname
+     globals()[funcname].__qualname__ = funcname
+
+
+@view_config(request_method="POST", routes=['server_Preparing', 'server_by_id_Preparing'],
              renderer='json', permission="use")
 def boost_server(request):
     """Boost a server: ie:
@@ -506,9 +468,10 @@ def boost_server(request):
     # Tell the agents to get to work.
     touch_id = server.touch_to_state(actor_id, vm_id, "Preparing")
 
-    return dict(vm_id=vm_id, cost=cost)
+    return dict(touch_id=touch_id, vm_id=vm_id, cost=cost)
 
-@view_config(request_method="POST", routes=['server_Deboost', 'server_by_id_Deboost'],
+# A call to this triggers extra Deboost actions
+@view_config(request_method="POST", routes=['server_Pre_Deboosting', 'server_by_id_Pre_Deboosting'],
              renderer='json', permission="use")
 def deboost_server(request):
     """Deboost a server: ie:
@@ -522,12 +485,10 @@ def deboost_server(request):
     """
     vm_id, actor_id = _resolve_vm(request)
 
-    # FIXME: This also needs to look up the other servers currently boosted
-    # and return a bad request if there is not enough capacity.
+    credit = server.get_deboost_credits(vm_id)
+    server.touch_to_add_credit(actor_id, credit)
 
-    server.touch_to_add_credit(actor_id, get_deboost_credits(vm_id))
-
-    #FIXME - cancel the deboost.  How??
+    #Scheduled deboosts don't need cancelling as they are ignored on unboosted servers.
 
     #FIXME - yet more hard-coding for cores/RAM
     prev_cores = 1
@@ -538,71 +499,19 @@ def deboost_server(request):
         #OK, use the defaults.
         pass
 
-    server.touch_to_add_specification(vm_id, prev_cores, prev_ram)
+    #If we're not careful, with this "go back to previous config" semantics, if a user de-boosts
+    #a server twice they will actually end up setting their baseline config to the boosted specs.
+    #Therefore do a check.
+    current_cores, current_ram = server.get_latest_specification(vm_id)
+
+    if not (prev_ram > current_ram):
+        server.touch_to_add_specification(vm_id, prev_cores, prev_ram)
 
     # Tell the agents to get to work.
     touch_id = server.touch_to_state(actor_id, vm_id, "Pre_Deboosting")
 
+    return dict(touch_id=touch_id, vm_id=vm_id, credit=credit)
 
-@view_config(request_method="POST", routes=['server_Stopped', 'server_by_id_Stopped'],
-             renderer='json', permission="act")
-def stopped_server(request):
-    """Put a server into the "Stopped" status.
-
-    :param vm_id: ID of VApp which we want to stop.
-    :returns: JSON containing VApp ID and job ID for progress calls.
-    """
-    return _set_server_state(request, "Stopped")
-
-@view_config(request_method="POST", routes=['server_Started', 'server_by_id_Started'],
-             renderer='json', permission="act")
-def started_server(request):
-    """Put a server into the "Started" status.
-
-    :param vm_id: ID of VApp which we want to register as started.
-    :returns: JSON containing VApp ID and job ID for progress calls.
-    """
-    return _set_server_state(request, "Started")
-
-@view_config(request_method="POST", routes=['server_Error', 'server_by_id_Error'],
-             renderer='json', permission="use")
-def error_server(request):
-    """Put a server into the "Error" status.
-
-    :param name: Name of VApp which we want to change
-    :returns: JSON containing VApp ID and job ID for progress calls.
-    """
-    return _set_server_state(request, "Error")
-
-@view_config(request_method="POST", routes=['server_Prepared', 'server_by_id_Prepared'],
-             renderer='json', permission="act")
-def prepared_server(request):
-    """Put a server into the "Prepared" status.
-
-    :param name: Name of VApp which we want to change
-    :returns: JSON containing VApp ID and job ID for progress calls.
-    """
-    return _set_server_state(request, "Prepared")
-
-@view_config(request_method="POST", routes=['server_Pre_Deboosted', 'server_by_id_Pre_Deboosted'],
-             renderer='json', permission="act")
-def predeboosted_server(request):
-    """Put a server into the "Pre_Deboosted" status.
-
-    :param name: Name of VApp which we want to change
-    :returns: JSON containing VApp ID and job ID for progress calls.
-    """
-    return _set_server_state(request, "Pre_Deboosted")
-
-@view_config(request_method="POST", routes=['server_Deboosted', 'server_by_id_Deboosted'],
-             renderer='json', permission="act")
-def deboosted_server(request):
-    """Put a server into the "Pre_Deboosted" status.
-
-    :param name: Name of VApp which we want to change
-    :returns: JSON containing VApp ID and job ID for progress calls.
-    """
-    return _set_server_state(request, "Deboosted")
 
 # Find out what needs de-boosting (agents only)
 @view_config(request_method="GET", route_name='deboosts', renderer='json', permission="act")
