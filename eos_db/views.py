@@ -485,7 +485,7 @@ def deboost_server(request):
     """
     vm_id, actor_id = _resolve_vm(request)
 
-    credit = server.get_deboost_credits(vm_id)
+    credit = server.get_time_until_deboost(vm_id)[3]
     server.touch_to_add_credit(actor_id, credit)
 
     #Scheduled deboosts don't need cancelling as they are ignored on unboosted servers.

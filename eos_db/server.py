@@ -298,9 +298,10 @@ def return_artifact_details(artifact_id, artifact_name=None, artifact_uuid=None,
 
     boostremaining = "N/A"
     deboost_time = 0
+    deboost_credit = 0
 
     #Because get_time_until_deboost() might report a deboost time for an un-boosted
-    #server if it was manually deboosted...
+    #server if it was manually deboosted, check the status
     if boosted == "Boosted":
         time_for_deboost = get_time_until_deboost(artifact_id, session=session)
         boostremaining = time_for_deboost[2] or "Not set"
@@ -308,6 +309,7 @@ def return_artifact_details(artifact_id, artifact_name=None, artifact_uuid=None,
         # Any browser will be able to render this as local time by using:
         #  var d = new Date(0) ;  d.setUTCSeconds(deboost_time)
         deboost_time = time_for_deboost[0].strftime("%s") if time_for_deboost[0] else 0
+        deboost_credit = time_for_deboost[3]
 
     try:
         cores, ram = get_latest_specification(artifact_id, session=session)
@@ -331,7 +333,8 @@ def return_artifact_details(artifact_id, artifact_name=None, artifact_uuid=None,
             "cores": cores,
             "ram": ram,
             "boostremaining": boostremaining,
-            "deboost_time": deboost_time
+            "deboost_time": deboost_time,
+            "deboost_credit": deboost_credit
             })
 
 def set_deboost(hours, touch_id):
@@ -432,13 +435,15 @@ def _get_server_boost_status(artifact_id, session=None):
         return "Unboosted"
 
 @with_session
-def get_deboost_credits(artifact_id, session):
+def get_deboost_credits(artifact_id, hours, session):
     """ Get the number of credits which should be refunded upon deboost.
+        If you don't know the number of hours call
+        get_time_until_deboost(vm_id)[3] instead.
 
     :param artifact_id: The artifact in question by ID.
-    :returns: Number of credits to be refunded..
+    :param hours:  The number of hours to credit.
+    :returns: Number of credits to be refunded.
     """
-    hours = (get_time_until_deboost(artifact_id, session=session)[1] or 0) // 3600
 
     #Don't end up debiting credits if a deboost is processed late and hours goes negative!
     #Also, this prevents get_latest_specification potentially throwing an exception we
@@ -656,11 +661,11 @@ def _get_latest_deboost_dt(vm_id, session):
               .first() )
     return state
 
-#No with_session decorator needed, but a sesh might be passed through.
+#No with_session decorator actually needed, but a sesh might be passed through.
 def get_time_until_deboost(vm_id, session=None):
     """ Get the time when until a VM is due to deboost, invarious formats.
-        We return a triplet:
-          [ (datetime)deboost_time, (int)seconds_until_deboost, (str)display_value ]
+        We return a quadruplet:
+          [ (datetime)deboost_time, (int)secs_until_deboost, (str)display_value, (int)credit ]
     """
     now = datetime.now()
     try:
@@ -677,9 +682,12 @@ def get_time_until_deboost(vm_id, session=None):
             #The caller can still look at the first 2 values to inspect expired boosts.
             display_value = "Expired"
 
-        return (deboost_dt, delta.total_seconds(), display_value)
+        #Work out what any unused time is worth.  This will always be an integer >=0
+        credit = get_deboost_credits(vm_id, hours=delta.total_seconds() // 3600)
+
+        return (deboost_dt, delta.total_seconds(), display_value, credit)
     except:
-        return (None, None, None)
+        return (None, None, None, 0)
 
 
 @with_session
