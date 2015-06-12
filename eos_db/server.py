@@ -693,7 +693,9 @@ def get_time_until_deboost(vm_id, session=None):
 @with_session
 def get_deboost_jobs(past, future, session):
     """ Get a list of pending deboosts.  Deboosts scheduled on un-boosted servers
-        will always be filtered out, so there is no need to double-check.
+        will always be filtered out here, so there is no need to double-check.
+        Note that although you specify the past and future in minutes you get back
+        the boost_remain in seconds.
         :param past: How many minutes far back to go.
         :param future : How far forward to look, also in minutes.
         :returns: Array of {server_name, server_id, seconds_remaining}
