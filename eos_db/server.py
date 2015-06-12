@@ -685,7 +685,7 @@ def get_time_until_deboost(vm_id, session=None):
         #Work out what any unused time is worth.  This will always be an integer >=0
         credit = get_deboost_credits(vm_id, hours=delta.total_seconds() // 3600)
 
-        return (deboost_dt, delta.total_seconds(), display_value, credit)
+        return (deboost_dt, int(delta.total_seconds()), display_value, credit)
     except:
         return (None, None, None, 0)
 
@@ -737,7 +737,7 @@ def get_deboost_jobs(past, future, session):
     #And return an array of triples as promised
     return [ dict(artifact_name=n,
                   artifact_id=i[1],
-                  boost_remain=(i[0] - now).total_seconds() )
+                  int(boost_remain=(i[0] - now).total_seconds()) )
              for n,i in res.items() ]
 
 @with_session
