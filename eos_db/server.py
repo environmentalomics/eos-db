@@ -737,7 +737,7 @@ def get_deboost_jobs(past, future, session):
     #And return an array of triples as promised
     return [ dict(artifact_name=n,
                   artifact_id=i[1],
-                  int(boost_remain=(i[0] - now).total_seconds()) )
+                  boost_remain=int( (i[0] - now).total_seconds() ) )
              for n,i in res.items() ]
 
 @with_session
