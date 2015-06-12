@@ -95,11 +95,10 @@ class TestVMActionsHTTP(unittest.TestCase):
         """
 
         # Create server
-        self.create_server("testserver")
+        sid = self.create_server("testserver")
 
         def get_state():
-            response = self.app.get('/servers/testserver/state',
-                            {'artifact_id': 'testserver'})
+            response = self.app.get('/servers/testserver/state')
             return response.json
 
         #All the states listed should simply add a touch and succeed without drama.
@@ -107,6 +106,10 @@ class TestVMActionsHTTP(unittest.TestCase):
             res = self.app.post('/servers/testserver/' + state)
             #print("Push result = " + str(res))
             self.assertEqual(get_state(), state)
+
+        #Also confirm this works by ID
+        resp2 = self.app.get('/servers/by_id/%s/state' % sid)
+        self.assertEqual(resp2.json, STATES_TO_TEST[-1])
 
     def test_retrieve_server(self):
         """ Pull back details of our server by name. """
@@ -120,11 +123,13 @@ class TestVMActionsHTTP(unittest.TestCase):
 
     def test_retrieve_server_by_id(self):
         """ Our server will have ID 1. Check that we can retrieve details of
-        it."""
+            it.
+        """
 
-        self.create_server("testserver")  # Create server
+        sid = self.create_server("testserver")  # Create server
 
         # Retrieve server details by name
+        self.assertEqual(sid, 1)
 
         response = self.app.get('/servers/by_id/1')
 
@@ -266,11 +271,10 @@ class TestVMActionsHTTP(unittest.TestCase):
                                 expect_errors=False)
 
     def create_server(self, name):
-        response = self.app.put('/servers/' + name,
-                                {'hostname': name,
-                                 'uuid': name },
-                                status=200,
-                                expect_errors=False)
+        return self.app.put('/servers/' + name,
+                            {'hostname': name, 'uuid': name },
+                            status=200,
+                            expect_errors=False).json
 
 
 if __name__ == '__main__':
