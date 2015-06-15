@@ -105,6 +105,7 @@ def options2(request):
 
 @view_config(request_method="OPTIONS", routes=["server_" + x for x in server.get_state_list()])
 @view_config(request_method="OPTIONS", routes=["server_by_id_" + x for x in server.get_state_list()])
+@view_config(request_method="OPTIONS", routes=['server_extend_boost', 'server_by_id_extend_boost'])
 def options3(request):
     resp = Response(None)
     resp.headers['Allow'] = "HEAD,POST,OPTIONS"
@@ -124,7 +125,7 @@ def retrieve_users(request):
     return res
 
 
-@view_config(request_method="PUT", route_name='user', renderer='json', permission="use")
+@view_config(request_method="PUT", route_name='user', renderer='json', permission="administer")
 def create_user(request):
     """ Create a user in the database. """
     #FIXME - the UUID for a user should be the e-mail address.  Can we make this explicit?
@@ -165,13 +166,13 @@ def retrieve_my_user(request):
         #Should be impossible unless a logged-in user is deleted.
         return HTTPInternalServerError()
 
-@view_config(request_method="PATCH", route_name='user', renderer='json', permission="use")
+@view_config(request_method="PATCH", route_name='user', renderer='json', permission="administer")
 def update_user(request):
     # FIXME: Not implemented.
     response = HTTPNotImplemented()
     return response
 
-@view_config(request_method="DELETE", route_name='user', renderer='json', permission="use")
+@view_config(request_method="DELETE", route_name='user', renderer='json', permission="administer")
 def delete_user(request):
     # FIXME: Not implemented. Some thought needs to go into this. I think a
     # deletion flag would be appropriate, but this will involve changing quite
@@ -205,9 +206,10 @@ def retrieve_user_touches(request):
     name = request.matchdict['name']
     return name
 
-@view_config(request_method="POST", route_name='user_credit', renderer='json', permission="act")
+@view_config(request_method="POST", route_name='user_credit', renderer='json', permission="administer")
 def create_user_credit(request):
-    """Adds credit to a user account, negative or positive.
+    """Adds credit to a user account, negative or positive.  Only an administrator can do this
+       directly.  Boost and Deboost actions will do this implicitly.
 
     Checks if username is valid, otherwise throws HTTP 404.
     Checks if credit is an integer, otherwise throws HTTP 400.
@@ -362,6 +364,7 @@ def get_server_owner(request):
 def _resolve_vm(request):
     """Function given a request works out the VM we are talking about and whether
        the current user actually has permission to do stuff to it.
+       Also returns the internal ID for the user, as well as the VM.
     """
 
     actor_id = None
@@ -432,7 +435,7 @@ for state in ['Starting', 'Stopping', 'Restarting', 'Error']:
      globals()[funcname].__name__ = funcname
      globals()[funcname].__qualname__ = funcname
 
-
+### Any user can Boost, but it will cost.
 @view_config(request_method="POST", routes=['server_Preparing', 'server_by_id_Preparing'],
              renderer='json', permission="use")
 def boost_server(request):
@@ -459,6 +462,10 @@ def boost_server(request):
     # on the cores requested, and assume the RAM level matches it.
     cost = server.check_and_remove_credits(actor_id, ram, cores, hours)
 
+    if not cost:
+        #Either we can't afford it or we can't determine the cost.
+        return HTTPBadRequest();
+
     #Schedule a de-boost
     server.touch_to_add_deboost(vm_id, hours)
 
@@ -470,7 +477,7 @@ def boost_server(request):
 
     return dict(touch_id=touch_id, vm_id=vm_id, cost=cost)
 
-# A call to this triggers extra Deboost actions
+# Likewise any user can deboost.
 @view_config(request_method="POST", routes=['server_Pre_Deboosting', 'server_by_id_Pre_Deboosting'],
              renderer='json', permission="use")
 def deboost_server(request):
@@ -480,6 +487,9 @@ def deboost_server(request):
         Set the CPUs and RAM to the previous state
         Put the server in a "Pre_Deboosting" status
 
+    Note that a user can Deboost at ANY time, but they only get credit if credit is due.
+    Deboosting a non-boosted server just amounts to a restart.
+
     :param {vm or name}: ID of VApp which we want to deboost.
     :returns: ???
     """
@@ -488,7 +498,7 @@ def deboost_server(request):
     credit = server.get_time_until_deboost(vm_id)[3]
     server.touch_to_add_credit(actor_id, credit)
 
-    #Scheduled deboosts don't need cancelling as they are ignored on unboosted servers.
+    #Scheduled timeouts don't need cancelling as they are ignored on unboosted servers.
 
     #FIXME - yet more hard-coding for cores/RAM
     prev_cores = 1
@@ -512,6 +522,34 @@ def deboost_server(request):
 
     return dict(touch_id=touch_id, vm_id=vm_id, credit=credit)
 
+@view_config(request_method="POST", routes=['server_extend_boost', 'server_by_id_extend_boost'],
+             renderer='json', permission="use")
+def extend_boost_on_server(request):
+    """Extends the Boost period on a server by adding a new deboost timeout, if
+       the user can afford it, and debiting the cost.
+    """
+    vm_id, actor_id = _resolve_vm(request)
+    hours = int(request.POST['hours'])
+
+    #See what level of boost we have just now.  Again, need to FIXME that hard-coding
+    cores, ram = get_latest_specification(vm_id)
+
+    cost = server.check_and_remove_credits(actor_id, ram, cores, hours)
+
+    if not cost:
+        #Either we can't afford it or we can't determine the cost.
+        return HTTPBadRequest();
+
+    #Work out when the new de-boost should be.  First get the remaining boost time as
+    #hours.  It's unlikely to be a whole number.  If the boost has expired somehow then
+    #don't be mean - count from now.
+    remaining_time = (server.get_time_until_deboost(vm_id)[1] or 0) / 3600.0
+    if remaining_time < 0 : remaining_time = 0
+
+    #Schedule a later de-boost
+    server.touch_to_add_deboost(vm_id, hours + remaining_time)
+
+    return dict(vm_id=vm_id, cost=cost)
 
 # Find out what needs de-boosting (agents only)
 @view_config(request_method="GET", route_name='deboosts', renderer='json', permission="act")

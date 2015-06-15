@@ -555,7 +555,10 @@ def touch_to_state(actor_id, artifact_id, state_name):
 def touch_to_add_deboost(vm_id, hours):
     """ Set and number of hours in the future at which a VM ought to be
     deboosted. Requires application of an associated touch in order to
-    link it to an artifact. """
+    link it to an artifact.
+    Note that hours can be fractional even though the user may only boost by the hour.
+    This is important for the extend_boost call.
+    """
     touch_id = _create_touch(None, vm_id, None)
 
     deboost_dt = datetime.now()
@@ -574,12 +577,9 @@ def check_and_remove_credits(actor_id, ram, cores, hours):
 
     #FIXME - should not be using hard-coded values here
     multiplier = 0
-    if cores == 2:
-        multiplier = 1
-    if cores == 8:
-        multiplier = 3
-    if cores == 16:
-        multiplier = 12
+    if cores >= 2:  multiplier = 1
+    if cores >= 8:  multiplier = 3
+    if cores >= 10: multiplier = 12
     cost = multiplier * hours
 
     #See if the user can afford it...

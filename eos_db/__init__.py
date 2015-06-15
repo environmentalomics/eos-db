@@ -169,5 +169,10 @@ def main(global_config, **settings):
         config.add_route('server_' + action      , '/servers/{name}/' + action    )
         config.add_route('server_by_id_' + action, '/servers/by_id/{id}/' + action)
 
+    # Call the extend boost which does not correspond to any state change
+    for action in ('extend_boost',):
+        config.add_route('server_' + action      , '/servers/{name}/' + action    )
+        config.add_route('server_by_id_' + action, '/servers/by_id/{id}/' + action)
+
     config.scan()
     return config.make_wsgi_app()
