@@ -532,7 +532,7 @@ def extend_boost_on_server(request):
     hours = int(request.POST['hours'])
 
     #See what level of boost we have just now.  Again, need to FIXME that hard-coding
-    cores, ram = get_latest_specification(vm_id)
+    cores, ram = server.get_latest_specification(vm_id)
 
     cost = server.check_and_remove_credits(actor_id, ram, cores, hours)
 
