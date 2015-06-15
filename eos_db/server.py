@@ -337,15 +337,6 @@ def return_artifact_details(artifact_id, artifact_name=None, artifact_uuid=None,
             "deboost_credit": deboost_credit
             })
 
-def set_deboost(hours, touch_id):
-    """ Set and number of hours in the future at which a VM ought to be
-    deboosted. Requires application of an associated touch in order to
-    link it to an artifact. """
-    deboost_dt = datetime.now()
-    deboost_dt += timedelta(hours=hours)
-    new_deboost = Deboost(deboost_dt=deboost_dt, touch_id=touch_id)
-
-    return _create_thingy(new_deboost)
 
 #FIXME - rationalise these to three functions:
 #  get_server_by_name
@@ -562,8 +553,16 @@ def touch_to_state(actor_id, artifact_id, state_name):
     return touch_id
 
 def touch_to_add_deboost(vm_id, hours):
+    """ Set and number of hours in the future at which a VM ought to be
+    deboosted. Requires application of an associated touch in order to
+    link it to an artifact. """
     touch_id = _create_touch(None, vm_id, None)
-    set_deboost(hours, touch_id)
+
+    deboost_dt = datetime.now()
+    deboost_dt += timedelta(hours=hours)
+    new_deboost = Deboost(deboost_dt=deboost_dt, touch_id=touch_id)
+
+    return _create_thingy(new_deboost)
 
 def check_and_remove_credits(actor_id, ram, cores, hours):
     """Called when a machine is boosted to see if the user can afford it.
