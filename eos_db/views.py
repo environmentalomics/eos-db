@@ -313,22 +313,14 @@ def create_server(request):
     newname = server.create_appliance(request.matchdict['name'], request.POST['uuid'])
     return newname
 
-@view_config(request_method="GET", route_name='server', renderer='json', permission="use")
+@view_config(request_method="GET", routes=['server', 'server_by_id'], renderer='json', permission="use")
 def retrieve_server(request):
     """
-    Gets artifact details from the server.
+    Gets artifact details from the server, based on the name or the internal ID.
     """
-    name = request.matchdict['name']
-    server_id = server.get_server_id_from_name(name)
-    server_details = server.return_artifact_details(server_id)
+    vm_id, actor_id = _resolve_vm(request)
+    server_details = server.return_artifact_details(vm_id)
     return server_details
-
-@view_config(request_method="GET", route_name='server_by_id', renderer='json', permission="use")
-def retrieve_server_by_id(request):
-    """
-    Gets artifact details, but uses the internal system ID.
-    """
-    return server.return_artifact_details(request.matchdict['id'])
 
 @view_config(request_method="PATCH", route_name='server', renderer='json', permission="use")
 def update_server(request):

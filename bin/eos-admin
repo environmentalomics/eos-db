@@ -27,6 +27,7 @@ eos-admin setgroup <username> users|administrators :
 #TODO - make this talk to the server via the web API, not via direct
 # instantiation.
 import sys
+from os import environ as env
 from getpass import getpass
 from traceback import print_exc
 from eos_db import server
@@ -86,7 +87,9 @@ def get_vcd_session():
                       settings.VCDetails.org,
                       settings.VCDetails.endpoint ]
     except:
-        pass
+        conn_args[0] = env.get('VCDUSER', '')
+        conn_args[2] = env.get('VCDENDPOINT', '')
+        conn_args[3] = env.get('VCDORG', '')
 
     conn_args[3] = input("Endpoint [%a]: " % conn_args[3]) or conn_args[3]
     conn_args[2] = input("Org [%a]: " % conn_args[2]) or conn_args[2]

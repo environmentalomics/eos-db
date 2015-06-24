@@ -147,7 +147,7 @@ class TestVMActions(unittest.TestCase):
     def test_ownership(self):
         artifact_id = self.my_create_appliance("owned")
         artifact2_id = self.my_create_appliance("unowned")
-        owner_id = s.create_user("users", "foo@example.com", "foo foo", "foo") 
+        owner_id = s.create_user("users", "foo@example.com", "foo foo", "foo")
         s.touch_to_add_ownership(artifact_id, owner_id)
 
         # Test that the user really owns the server.
@@ -155,6 +155,49 @@ class TestVMActions(unittest.TestCase):
 
         # Test that the user does not own the second server.
         self.assertFalse(s.check_ownership(artifact2_id, owner_id))
+
+    def test_ownership_2(self):
+        """I had a version of the portal that passed the above test but when you
+           added a VM to any user all the users started to see it.  Not good!
+        """
+        owners = []
+        artifacts = []
+        for idx in (0,1,2):
+            owners.append(s.create_user("users", "foo%s@example.com" % idx , "foo %s" % idx, "foo%s" % idx))
+            artifacts.append(self.my_create_appliance("box%s" % idx))
+
+            s.touch_to_add_ownership(artifacts[idx], owners[0])
+            s.touch_to_add_ownership(artifacts[idx], owners[idx])
+
+        #All VMs owned by last owner set
+        self.assertTrue( s.check_ownership(artifacts[0], owners[0]) and
+                         s.check_ownership(artifacts[1], owners[1]) and
+                         s.check_ownership(artifacts[2], owners[2]) )
+
+        #All VMs also owned by 0
+        self.assertTrue( s.check_ownership(artifacts[1], owners[0]) and
+                         s.check_ownership(artifacts[2], owners[0]) )
+
+        #VMs not owned by other owners
+        self.assertFalse(s.check_ownership(artifacts[0], owners[1]) or
+                         s.check_ownership(artifacts[2], owners[1]) or
+                         s.check_ownership(artifacts[0], owners[2]) or
+                         s.check_ownership(artifacts[1], owners[2]) )
+
+        #This is reflected in list_artifacts_for_user?
+        self.assertEqual(len(s.list_artifacts_for_user(owners[0])), 3)
+        self.assertEqual(len(s.list_artifacts_for_user(owners[1])), 1)
+        self.assertEqual(len(s.list_artifacts_for_user(owners[2])), 1)
+
+        #Likewise requesting an artifact I don't own should give an error,
+        #but that has to be tested via webtest.
+
+        # Finally, adding a new box2 should Nix the old box2
+        self.my_create_appliance("box2")
+        self.assertEqual(len(s.list_artifacts_for_user(owners[0])), 2)
+        self.assertEqual(len(s.list_artifacts_for_user(owners[1])), 1)
+        self.assertEqual(len(s.list_artifacts_for_user(owners[2])), 0)
+
 
 if __name__ == '__main__':
     unittest.main()

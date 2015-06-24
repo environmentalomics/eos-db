@@ -266,12 +266,11 @@ def list_artifacts_for_user(user_id, session):
     # This bit was  _list_artifacts_for_user(user_id)
     servers = (session
                .query(Artifact.id, Artifact.name, Artifact.uuid)
-               .filter(Artifact.id == Touch.artifact_id)
-               .filter(Touch.id == Ownership.touch_id)
-               .filter(Ownership.user_id == Actor.id)
-               .filter(Actor.id == user_id)
-               .distinct(Artifact.id)
                .all())
+
+    # Because of my logic that adding a new server with an existing name masks
+    # the old server, we actually want to get all the servers here and then
+    # post-filter them, or at least that is the simplest approach.
 
     #OrderedDict gives me the property of updating any server listed
     #twice while still maintaining database order.
@@ -284,7 +283,8 @@ def list_artifacts_for_user(user_id, session):
         #END workaround
         if server[1] in artifacts:
             del artifacts[server[1]]
-        artifacts[server[1]] = return_artifact_details(*server, session=session)
+        if check_ownership(server[0], user_id, session=session):
+            artifacts[server[1]] = return_artifact_details(*server, session=session)
     return artifacts.values()
 
 @with_session
