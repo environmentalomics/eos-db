@@ -110,8 +110,11 @@ def main(global_config, **settings):
     # database in place.
     server.choose_engine(settings['server'], replace=False)
 
+    # Endpoints that can be called without authentication
     # Top-level home page. Yields API call list.
     config.add_route('home', '/')
+    # View of BoostLevels from settings.py
+    config.add_route('boostlevels', '/boostlevels')
 
     # User-related API calls (callable by users)
 

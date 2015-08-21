@@ -23,7 +23,6 @@ from datetime import datetime, timedelta
 
 engine = None  # Assume no default database connection
 
-
 # Load config.
 DB = None
 try:
@@ -33,6 +32,22 @@ except:
     # If no settings file is supplied, we connect to the database eos_db without
     # a username or password - ie. rely on PostgreSQL ident auth.
     pass
+
+# If no Boost Levels are configured supply a baseline default.
+# In the case of other exceptions - ie. If the the settings are incomplete -
+# let the exception propogate to produce an error.
+BL = {}
+try:
+    from eos_db.settings import BoostLevels
+
+    BL['baseline'] = BoostLevels.baseline
+    BL['levels']   = BoostLevels.levels
+    BL['capacity'] = BoostLevels.capacity
+except ImportError:
+    BL['baseline'] = dict(label='Default', ram=2, cores=1)
+    BL['levels']   = tuple()
+    BL['capacity'] = tuple()
+
 
 def with_session(f):
     """Decorator that automatically passes a Session to a function and then shuts
@@ -77,7 +92,7 @@ def choose_engine(enginestring, replace=True):
         return
 
     if enginestring == "PostgreSQL":
-        if DB and DB.username:
+        if DB and DB.__dict__.get('username'):
             # Password auth
             engine = create_engine('postgresql://%s:%s@%s/%s'
                                    % (DB.username,
@@ -164,6 +179,9 @@ def setup_states(ignore_dupes=True):
             if not ignore_dupes: raise e
 
     return states_added
+
+def get_boost_levels():
+    return BL
 
 @with_session
 def list_user_ids(session):

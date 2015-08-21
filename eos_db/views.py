@@ -56,6 +56,7 @@ class PermissionsMap():
 def home_view(request):
     """ Return a list of all valid API calls by way of documentation. """
     call_list = {"Valid API Call List":{
+                              "See valid Boost levels": "/boostlevels",
                               "Retrieve User List": "/users",
                               "Get my details": "/user",
                               "Get my touches": "/user/touches",
@@ -83,6 +84,10 @@ def home_view(request):
                               }
                  }
     return call_list
+
+@view_config(request_method="GET", route_name='boostlevels', renderer='json')
+def blview(request):
+    return server.get_boost_levels()
 
 # OPTIONS call result
 

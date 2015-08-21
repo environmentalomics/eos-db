@@ -20,24 +20,24 @@ class BoostLevels():
        Not sure if we actually need this or not?
     """
     baseline = { 'label' : 'Standard',
-                 'ram'   : '16',
-                 'cores' : '1',
+                 'ram'   :  16,
+                 'cores' :  1,
                  'cost'  :  0  }
 
     """Levels in order.  Ideally he portal should fetch this list from a public API call.
        In any case the validity of a boost request should be checked against this table"""
     levels = (
         { 'label'  : 'Standard+',
-          'ram'    : '40',
-          'cores'  : '2',
+          'ram'    :  40,
+          'cores'  :  2,
           'cost'   :  1           },
         { 'label'  : 'Large',
-          'ram'    : '140',
-          'cores'  : '8',
+          'ram'    :  140,
+          'cores'  :  8,
           'cost'   :  3           },
         { 'label'  : 'Max',
-          'ram'    : '400',
-          'cores'  : '16',
+          'ram'    :  400 ,
+          'cores'  :  16,
           'cost'   :  12          },
     )
 
