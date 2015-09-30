@@ -590,11 +590,15 @@ def check_and_remove_credits(actor_id, ram, cores, hours):
     """
 
     if actor_id is None:
-        #This would happen if an agent called this function
+        #This would happen if an agent called this function.
+        #Agents don't get charged.
         return 0
 
-    #FIXME - should not be using hard-coded values here
+    #This is not ideal - the client requests RAM/Cores.  We need to see if this
+    #translates back to a real boost level and work out the cost.
     multiplier = 0
+    for lev in get_boost_levels():
+        if(cores >= lev !!!
     if cores >= 2:  multiplier = 1
     if cores >= 8:  multiplier = 3
     if cores >= 10: multiplier = 12
@@ -680,7 +684,7 @@ def _get_latest_deboost_dt(vm_id, session):
 
 #No with_session decorator actually needed, but a sesh might be passed through.
 def get_time_until_deboost(vm_id, session=None):
-    """ Get the time when until a VM is due to deboost, invarious formats.
+    """ Get the time until a VM is due to deboost, in various formats.
         We return a quadruplet:
           [ (datetime)deboost_time, (int)secs_until_deboost, (str)display_value, (int)credit ]
     """
