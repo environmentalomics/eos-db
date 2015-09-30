@@ -138,7 +138,6 @@ elif arg[0] == 'addvm':
     except TypeError:
         sys.exit("No such user.")
 
-
     if not arg[2:]:
         try:
             to_add = by_user_getter(username)
@@ -155,12 +154,27 @@ elif arg[0] == 'addvm':
         to_add = (arg[2:4],)
 
     for mname, muuid in to_add:
-        id1 = server.create_appliance(mname, muuid)
-        id2 = server.touch_to_add_ownership(id1, user_id)
 
+        #If a machine with this name/uuid already exists in the DB, add the user
+        #as a controller for that VM.  Otherwise, add a new VM.
+        #At the moment this means there is no way to change ownership, only to
+        #add extra owners.
         print ("Adding %s=%s for %s" % (mname, muuid, username))
-        print ("New server created with id %s" % id1)
-        print ("New server ownership added to user id %s" % user_id)
+        try:
+            oldid = server.get_server_id_from_name(mname)
+            olduuid = server.get_server_uuid_from_id(oldid)
+            if olduuid !=  muuid:
+                raise IndexError("No matching VM found")
+
+            server.touch_to_add_ownership(oldid, user_id)
+            print ("Added user as owner of existing VM with id %s" % oldid)
+        except:
+
+            id1 = server.create_appliance(mname, muuid)
+            id2 = server.touch_to_add_ownership(id1, user_id)
+
+            print ("New VM created with id %s" % id1)
+            print ("New VM ownership set to user id %s" % user_id)
 
 elif arg[0] == 'addcredit':
     print ("Adding credit...")
