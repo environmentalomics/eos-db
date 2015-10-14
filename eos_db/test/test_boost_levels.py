@@ -40,6 +40,9 @@ class TestBoostLevels(unittest.TestCase):
         # 1) Mock eos_db.settings
         # 2) imp.reload(eos_db.server)
 
+        # However, it would probably make more sense to put the settings in a .json file
+        # with the same name as the .ini file - ie. production.json, development.json, test.json
+
         #tbl_mock will replace the eos_db.settings module
         tbl_mock = Mock(('BoostLevels',))
 
@@ -76,7 +79,7 @@ class TestBoostLevels(unittest.TestCase):
 
         #Inject the new values
         sys.modules['eos_db.settings'] = tbl_mock
-        imp.reload(eos_db.server)
+        imp.reload(server)
         app = self.testapp
 
         r = app.get('/boostlevels')

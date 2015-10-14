@@ -488,23 +488,18 @@ def deboost_server(request):
     Deboosting a non-boosted server just amounts to a restart.
 
     :param {vm or name}: ID of VApp which we want to deboost.
-    :returns: ???
+    :returns: dict(touch_id, vm_id, credit) where credit is the refunded amount
     """
     vm_id, actor_id = _resolve_vm(request)
 
     credit = server.get_time_until_deboost(vm_id)[3]
     server.touch_to_add_credit(actor_id, credit)
 
-    #Scheduled timeouts don't need cancelling as they are ignored on unboosted servers.
+    #Scheduled timeouts don't need cancelling as they are ignored on unboosted servers,
+    #and if the user re-boosts then the new timeout will mask the old one.
 
-    #FIXME - yet more hard-coding for cores/RAM
-    prev_cores = 1
-    prev_ram = 16
-    try:
-        prev_cores, prev_ram = server.get_previous_specification(vm_id)
-    except:
-        #OK, use the defaults.
-        pass
+    #This call will return the baseline if there is no previous spec.
+    prev_cores, prev_ram = server.get_previous_specification(vm_id)
 
     #If we're not careful, with this "go back to previous config" semantics, if a user de-boosts
     #a server twice they will actually end up setting their baseline config to the boosted specs.
@@ -528,7 +523,7 @@ def extend_boost_on_server(request):
     vm_id, actor_id = _resolve_vm(request)
     hours = int(request.POST['hours'])
 
-    #See what level of boost we have just now.  Again, need to FIXME that hard-coding
+    #See what level of boost we have just now.
     cores, ram = server.get_latest_specification(vm_id)
 
     cost = server.check_and_remove_credits(actor_id, ram, cores, hours)
@@ -570,16 +565,16 @@ def retrieve_server_touches(request):
 @view_config(request_method="POST", renderer='json', permission="act",
              routes=['server_specification', 'server_by_id_specification'])
 def set_server_specification(request):
-    """ Set number of cores and amount of RAM for a VM. These numbers should
-        only match the given specification types listed below.
-        Regular users can only do this indirectly via boost/deboost.
+    """ Set number of cores and amount of RAM for a VM directly.
+
+        Regular users can only do this indirectly via boost/deboost, which
+        will check that the levels match one of the approved values.
     """
     vm_id, actor_id = _resolve_vm(request)
 
-    # FIXME - This really shouldn't be hardcoded.
-    cores = request.POST.get('cores')
-    ram = request.POST.get('ram')
-    if (cores not in ['1', '2', '4', '16']) or (ram not in ['1', '4', '8', '16', '400']):
+    cores = int(request.POST.get('cores'))
+    ram = int(request.POST.get('ram'))
+    if (cores <= 0) or (ram <= 0):
         return HTTPBadRequest()
     else:
         server.touch_to_add_specification(vm_id, cores, ram)

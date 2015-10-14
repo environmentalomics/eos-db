@@ -148,11 +148,9 @@ class TestVMActionsHTTP(unittest.TestCase):
 
     def test_set_get_server_specification(self):
         """ Follows hard-coded rules for machine behaviour.
-        Set machine CPUs to 2. Check, should pass.
-        Set machine CPUs to 65000. Check, should fail.
-        Set machine RAM to 16. Check, should pass.
-        Set machine RAM to 65000. Check, should fail.
-        Check that machine RAM and Cores are 2 and 16 as above. """
+        Set machine CPUs to 2, RAM to 123. Check, should pass.
+        Set machine CPUs to 0. Check, should fail.
+        Check that machine RAM and Cores are 2 and 123 as above. """
 
         self.create_server("testserver")  # Create server
 
@@ -161,14 +159,14 @@ class TestVMActionsHTTP(unittest.TestCase):
         response = self.app.post('/servers/testserver/specification',
                                 {'name': 'testserver',
                                  'cores': 2,
-                                 'ram': 16 },
+                                 'ram': 123 },
                                 status=200,
                                 expect_errors=False)
 
         response = self.app.post('/servers/testserver/specification',
                                 {'name': 'testserver',
-                                 'cores': 65000,
-                                 'ram': 65000 },
+                                 'cores': 0,
+                                 'ram': 40 },
                                 status=400,
                                 expect_errors=False)
 
@@ -178,6 +176,9 @@ class TestVMActionsHTTP(unittest.TestCase):
                                 {'hostname': 'testserver'},
                                 status=200,
                                 expect_errors=False)
+
+        self.assertEqual( response.json['cores'], 2)
+        self.assertEqual( response.json['ram'], 123)
 
     def test_retrieve_servers_by_state(self):
         """ The agents need to find out about servers to be acted on.

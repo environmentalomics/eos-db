@@ -2,10 +2,11 @@
 
    Need to sort out which tests live here and which in test_vm_actions_http
 """
-import os
+import os, sys, imp
 import unittest
 from eos_db import server
 from webtest import TestApp
+from unittest.mock import patch, Mock
 from pyramid.paster import get_app
 from http.cookiejar import DefaultCookiePolicy
 
@@ -218,43 +219,101 @@ class TestUserAPI(unittest.TestCase):
         server_info = self.app.get('/servers/fooserver').json
         self.assertEqual(server_info['state'], 'Error')
 
+    class _SettingsMocker():
+        def __init__(self, outer, settings):
+            self.outer = outer
+            self.settings = settings
+
+        def __enter__(self):
+            # Save state before we mess with the internals
+            self._settings = sys.modules.get('eos_db.settings')
+
+            #Inject the new values
+            sys.modules['eos_db.settings'] = self.settings
+            #imp.reload(server)
+            #self.outer.app = TestApp(self.outer.appconf)
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            sys.modules['eos_db.settings'] = self._settings
+            del self._settings
+
+    def _mock_boost_levels(self):
+        #Trick borrowed from test_boost_levels tests.
+        #tbl_mock will replace the eos_db.settings module
+        tbl_mock = Mock(('BoostLevels',))
+
+        tbl_mock.BoostLevels.baseline = {
+                'label' : 'test0',
+                'ram'   :  16 ,
+                'cores' :  1 }
+
+        tbl_mock.BoostLevels.levels = (
+                { 'label'  : 'test1',
+                  'ram'    :  40 ,
+                  'cores'  :  2 ,
+                  'cost'   :  1           },
+                { 'label'  : 'test2',
+                  'ram'    :  140 ,
+                  'cores'  :  8 ,
+                  'cost'   :  3           },
+                { 'label'  : 'test3',
+                  'ram'    :  400 ,
+                  'cores'  :  16 ,
+                  'cost'   :  12          },
+            );
+
+        tbl_mock.BoostLevels.capacity = (
+                ( 20,  0,  0 ),
+                ( 15,  1,  0 ),
+                ( 10,  2,  0 ),
+                (  5,  3,  0 ),
+                (  0,  4,  0 ),
+                (  5,  0,  1 ),
+                (  0,  1,  1 )
+            );
+
+        return self._SettingsMocker(self, tbl_mock)
+
     def test_boost_deboost_server(self):
         """ Test the boost call, which is done by putting the server into /Preparing.
             After this the server should be in the Preparing state and the user should
             have fewer credits.
             Also test the deboost.
         """
-        server_id = self.create_server('boostme', 'testuser')
-        self.add_credit(123, 'testuser')
 
-        self.app.post('/servers/boostme/Preparing', params=dict(hours=20, cores=2, ram=40))
+        with self._mock_boost_levels():
 
-        #Check the user
-        user_info = self.app.get('/user').json
-        self.assertEqual(user_info['credits'], 103)
+            server_id = self.create_server('boostme', 'testuser')
+            self.add_credit(123, 'testuser')
 
-        #Check the server
-        info_expected = dict(boosted="Boosted", boostremaining="19 hrs, 59 min", ram="40 GB", cores="2")
-        server_info = self.app.get('/servers/boostme').json
-        #Remove items I don't want to compare from server_info
-        info_got = {k:str(server_info[k]) for k in server_info if k in info_expected}
+            self.app.post('/servers/boostme/Preparing', params=dict(hours=20, cores=2, ram=40))
 
-        self.assertEqual(info_got, info_expected)
+            #Check the user
+            user_info = self.app.get('/user').json
+            self.assertEqual(user_info['credits'], 103)
 
-        #Deboost and check again
-        self.app.post('/servers/boostme/Pre_Deboosting')
+            #Check the server
+            info_expected = dict(boosted="Boosted", boostremaining="19 hrs, 59 min", ram="40 GB", cores="2")
+            server_info = self.app.get('/servers/boostme').json
+            #Remove items I don't want to compare from server_info
+            info_got = {k:str(server_info[k]) for k in server_info if k in info_expected}
 
-        #Check the user - we should be down 1 credit.
-        user_info = self.app.get('/user').json
-        self.assertEqual(user_info['credits'], 122)
+            self.assertEqual(info_got, info_expected)
 
-        #Check the server once more.
-        info_expected = dict(boosted="Unboosted", boostremaining="N/A", ram="16 GB", cores="1")
-        server_info = self.app.get('/servers/boostme').json
-        #Remove items I don't want to compare from server_info
-        info_got = {k:str(server_info[k]) for k in server_info if k in info_expected}
+            #Deboost and check again
+            self.app.post('/servers/boostme/Pre_Deboosting')
 
-        self.assertEqual(info_got, info_expected)
+            #Check the user - we should be down 1 credit.
+            user_info = self.app.get('/user').json
+            self.assertEqual(user_info['credits'], 122)
+
+            #Check the server once more.
+            info_expected = dict(boosted="Unboosted", boostremaining="N/A", ram="16 GB", cores="1")
+            server_info = self.app.get('/servers/boostme').json
+            #Remove items I don't want to compare from server_info
+            info_got = {k:str(server_info[k]) for k in server_info if k in info_expected}
+
+            self.assertEqual(info_got, info_expected)
 
     def test_restart_server(self):
         """ Check that a server appears in state 'Restarted' after using the

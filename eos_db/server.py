@@ -320,7 +320,7 @@ def return_artifact_details(artifact_id, artifact_name=None, artifact_uuid=None,
 
     #Because get_time_until_deboost() might report a deboost time for an un-boosted
     #server if it was manually deboosted, check the status
-    if boosted == "Boosted":
+    if boosted:
         time_for_deboost = get_time_until_deboost(artifact_id, session=session)
         boostremaining = time_for_deboost[2] or "Not set"
         # Get deboost time as UNIX seconds-since-epoch
@@ -347,7 +347,7 @@ def return_artifact_details(artifact_id, artifact_name=None, artifact_uuid=None,
             "change_dt": str(change_dt[0])[0:16],
             "create_dt": str(create_dt[0])[0:16],
             "state": state,
-            "boosted": boosted,
+            "boosted": "Boosted" if boosted else "Unboosted",
             "cores": cores,
             "ram": ram,
             "boostremaining": boostremaining,
@@ -423,25 +423,20 @@ def get_user_id_from_name(name, session):
     return user_id[0]
 
 def _get_server_boost_status(artifact_id, session=None):
-    """ Return the boost status (either "Boosted" or "Unboosted" of the given
-    artifact by ID.
-
-    Get the system ID of a user from his name.
+    """ Return the boost status (either true/"Boosted" or false/"Unboosted") of the given
+    artifact by ID.  A VM is believed to be boosted if either the RAM or CPU count is higher
+    than the baseline value.
 
     :param artifact_id: The artifact in question by ID.
-    :returns: String giving boost status.
+    :returns: Bool giving boost status.
     """
-    # FIXME: Ideally this should really return a boolean to indicate whether a
-    # machine is boosted or not.
     try:
         cores, ram = get_latest_specification(artifact_id, session=session)
     except:
+        #New machines must be considered to be like this...
         cores, ram = 0, 0
-    # FIXME - remove hard-coding of 40
-    if ram >= 40:
-        return "Boosted"
-    else:
-        return "Unboosted"
+
+    return (ram > BL['baseline']['ram']) or (cores > BL['baseline']['cores'])
 
 @with_session
 def get_deboost_credits(artifact_id, hours, session):
@@ -457,16 +452,16 @@ def get_deboost_credits(artifact_id, hours, session):
     #Don't end up debiting credits if a deboost is processed late and hours goes negative!
     #Also, this prevents get_latest_specification potentially throwing an exception we
     #don't care about.
-    if not hours > 0: return 0
+    if hours <= 0: return 0
 
+    #This is very similar to the code in check_and_remove_credits but in this case
+    #we are less specific.  Find the highest level that the VM meets rather than requiring
+    #an exact match.
     cores, ram = get_latest_specification(artifact_id, session=session)
     multiplier = 0
-    if cores == 2:
-        multiplier = 1
-    if cores == 8:
-        multiplier = 3
-    if cores == 16:
-        multiplier = 12
+    for lev in get_boost_levels()["levels"]:
+        if(cores >= lev['cores'] and ram >= lev['ram']):
+            multiplier = lev['cost']
 
     return multiplier * hours
 
@@ -594,14 +589,19 @@ def check_and_remove_credits(actor_id, ram, cores, hours):
         #Agents don't get charged.
         return 0
 
-    #This is not ideal - the client requests RAM/Cores.  We need to see if this
-    #translates back to a real boost level and work out the cost.
-    multiplier = 0
-    for lev in get_boost_levels():
-        if(cores >= lev !!!
-    if cores >= 2:  multiplier = 1
-    if cores >= 8:  multiplier = 3
-    if cores >= 10: multiplier = 12
+    #This is not ideal - the client requests RAM/Cores explicitly.  We need to see if this
+    #translates back to a real boost level and work out the cost.  If there is no exact
+    #match we must fail.
+    multiplier = -1
+    for lev in get_boost_levels()["levels"]:
+        if(cores == lev['cores'] and ram == lev['ram']):
+            multiplier = lev['cost']
+
+    #Return if we didn't find a match.  Note I'm using -1 as you could conceivably have a free
+    #boost level but not one that pays you!
+    if multiplier < 0:
+        return None
+
     cost = multiplier * hours
 
     #See if the user can afford it...
@@ -650,7 +650,8 @@ def touch_to_add_specification(vm_id, cores, ram):
 @with_session
 def get_latest_specification(vm_id, session):
     """ Return the most recent / current state of a VM.  Equivalent to
-        get_previous_specification(index=0).
+        get_previous_specification(index=0) except that this will raise
+        an exception if there is no spec in the database.
 
     :param vm_id: A valid VM id.
     :returns: String containing current status.
@@ -743,7 +744,7 @@ def get_deboost_jobs(past, future, session):
         # It's possible the touch is attached to a server_id that was overwitten,
         # but then either the real server is un-boosted or else it will have a later
         # deboost set anyway.  But that's why we need the 'del' here...
-        if _get_server_boost_status(server_id) != 'Boosted':
+        if not _get_server_boost_status(server_id):
             if server_name in res : del res[server_name]
             continue
 
@@ -764,7 +765,8 @@ def get_deboost_jobs(past, future, session):
 @with_session
 def get_previous_specification(vm_id, index=1, session=None):
     """Get the previous machine spec, or indeed the last-but-one or whatever
-       index you like.
+       index you like.  If the index is out of range this will return the default
+       baseline spec.
     """
     state = ( session
               .query(Specification.cores, Specification.ram)
@@ -773,7 +775,11 @@ def get_previous_specification(vm_id, index=1, session=None):
               .filter(Touch.touch_dt != None)
               .order_by(Touch.touch_dt.desc())
               .all() )
-    return state[index]
+
+    try:
+        return state[index]
+    except IndexError:
+        return BL['baseline']['cores'], BL['baseline']['ram']
 
 
 def touch_to_add_node():

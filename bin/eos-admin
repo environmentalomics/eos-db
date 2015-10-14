@@ -168,7 +168,7 @@ elif arg[0] == 'addvm':
 
             server.touch_to_add_ownership(oldid, user_id)
             print ("Added user as owner of existing VM with id %s" % oldid)
-        except:
+        except IndexError:
 
             id1 = server.create_appliance(mname, muuid)
             id2 = server.touch_to_add_ownership(id1, user_id)

@@ -229,8 +229,8 @@ class TestAgentAPI(unittest.TestCase):
         dj2 = app.get('/deboost_jobs', dict(past=12*60)).json
         self.assertEqual( set(s['artifact_name'] for s in dj2), set(('srv2', 'srv3')) )
 
-        #And if we deboost VM2 (via an API call, why not!)...
-        app.post('/servers/srv2/specification', dict(cores=1, ram=16))
+        #And if we deboost VM2 (via an API call to set the default baseline)...
+        app.post('/servers/srv2/specification', dict(cores=1, ram=2))
         dj3 = app.get('/deboost_jobs', dict(past=12*60)).json
         self.assertEqual( set(s['artifact_name'] for s in dj3), set(('srv3',)) )
 
