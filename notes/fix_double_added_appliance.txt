@@ -1,0 +1,29 @@
+In the current data model, each Appliance (VM) can have any number
+of owners.  But when using eos-admin to try and add a new oner (Soon) to a VM
+(bl8eos1) I ended up making a new bl8eos1
+and making Soon the owner of it.  Subtle, and normally it wouldn't matter but
+in this case I want shared ownership.  So a a little database hacking is in
+order.
+
+So - on Garudimimus:
+
+$ sudo -u eos-db psql -d eos_db
+
+=> select * from artifact;
+   #id=25 is the new record.  id=1 is the old record.
+=> select * from ownership join resource on resource.id = ownership.id join
+touch on resource.touch_id = touch.id join "user" on ownership.user_id =
+"user".id;
+   #Touch 2580 relating to ownership 1066 associated hyugwe with VM 25.
+=> select * from touch where id = 2580;
+   #Confirms this ownership is attached to artifact 25
+
+So, even though this is an update-free schema I should be able to:
+
+1) Update touch 2580 to relate to artifact 1
+2) Remove appliance 25
+3) Remove artifact 25
+
+UPDATE touch SET artifact_id=1 WHERE id=2580;
+DELETE FROM appliance WHERE id=25;
+DELETE FROM artifact WHERE id=25;
