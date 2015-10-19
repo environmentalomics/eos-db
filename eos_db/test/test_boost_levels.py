@@ -1,10 +1,9 @@
 import unittest
 import sys, os, imp
 from webtest import TestApp
-from unittest.mock import patch, Mock
 from pyramid.paster import get_app
 
-import eos_db.server
+from eos_db import server
 
 # Normally I'd frown upon any code that discovers it's own location, but in this
 # case it makes sense to use test.ini from the same folder as the test module.
@@ -26,8 +25,9 @@ class TestBoostLevels(unittest.TestCase):
 
     def test_get_def_boost_levels(self):
 
-        app = self.testapp
-        r = app.get('/boostlevels')
+        # Note that vlaues will now be loaded automatically from test.conf.ini
+
+        r = self.testapp.get('/boostlevels')
 
         self.assertEqual(r.json['baseline']['cores'], 1)
         self.assertEqual(r.json['levels'], [])
@@ -35,24 +35,20 @@ class TestBoostLevels(unittest.TestCase):
 
     def test_good_boost_levels(self):
 
-        # Does our choice to embed the configuration in code stop us testing
-        # an alternative configuration?  Of course not!
-        # 1) Mock eos_db.settings
-        # 2) imp.reload(eos_db.server)
+        # With the original code we had to embed the settings into a settings.py file.
+        # Now we have the settings in a .json file with the same name as the .ini file
+        # - ie. production.conf.json, development.conf.json, test.conf.json.
+        # But we can also load new settings.
 
-        # However, it would probably make more sense to put the settings in a .json file
-        # with the same name as the .ini file - ie. production.json, development.json, test.json
+        conf = dict(BoostLevels={})
 
-        #tbl_mock will replace the eos_db.settings module
-        tbl_mock = Mock(('BoostLevels',))
-
-        tbl_mock.BoostLevels.baseline = {
+        conf['BoostLevels']['baseline'] = {
                 'label' : 'test0',
                 'ram'   :  3 ,
                 'cores' :  1 ,
                 'cost'  :  0  }
 
-        tbl_mock.BoostLevels.levels = (
+        conf['BoostLevels']['levels'] = (
                 { 'label'  : 'test1',
                   'ram'    :  10 ,
                   'cores'  :  2 ,
@@ -67,7 +63,7 @@ class TestBoostLevels(unittest.TestCase):
                   'cost'   :  12          },
             );
 
-        tbl_mock.BoostLevels.capacity = (
+        conf['BoostLevels']['capacity'] = (
                 ( 20,  0,  0 ),
                 ( 15,  1,  0 ),
                 ( 10,  2,  0 ),
@@ -77,12 +73,10 @@ class TestBoostLevels(unittest.TestCase):
                 (  0,  1,  1 )
             );
 
-        #Inject the new values
-        sys.modules['eos_db.settings'] = tbl_mock
-        imp.reload(server)
-        app = self.testapp
+        #Load up the new values
+        server.set_config(conf)
 
-        r = app.get('/boostlevels')
+        r = self.testapp.get('/boostlevels')
 
         self.assertEqual(r.json['baseline']['ram'],  3)
         self.assertEqual(len(r.json['levels']),      3)

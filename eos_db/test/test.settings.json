@@ -1,0 +1,21 @@
+{
+    /* This is an settings file for use in the tests. */
+
+
+    "BoostLevels" : {
+	/* This structure captures the valid Boost levels for the system.
+	 * It should be edited depending on what you can actually run.
+	 */
+
+	/* Baseline state for machines. */
+	"baseline" : { "label" : "test_baseline",
+		       "ram"   :  16,
+		       "cores" :  1,
+		       "cost"  :  0  }
+    },
+
+    "MachineStates" : {
+        "state_list" : [ "TestExtraState" ]
+    }
+
+}

@@ -20,34 +20,22 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timedelta
+from eos_db.json_loader import parse_json_file
 
 engine = None  # Assume no default database connection
 
-# Load config.
+# Load config: DB, BL, and EXTRA_STATES
 DB = None
-try:
-    from eos_db.settings import DBDetails as DB
-except:
-    # This bare except statement is legit.
-    # If no settings file is supplied, we connect to the database eos_db without
-    # a username or password - ie. rely on PostgreSQL ident auth.
-    pass
 
 # If no Boost Levels are configured supply a baseline default.
 # In the case of other exceptions - ie. If the the settings are incomplete -
 # let the exception propogate to produce an error.
 BL = {}
-try:
-    from eos_db.settings import BoostLevels
+BL['baseline'] = dict(label='Default', ram=2, cores=1)
+BL['levels']   = tuple()
+BL['capacity'] = tuple()
 
-    BL['baseline'] = BoostLevels.baseline
-    BL['levels']   = BoostLevels.levels
-    BL['capacity'] = BoostLevels.capacity
-except ImportError:
-    BL['baseline'] = dict(label='Default', ram=2, cores=1)
-    BL['levels']   = tuple()
-    BL['capacity'] = tuple()
-
+EXTRA_STATES = None
 
 def with_session(f):
     """Decorator that automatically passes a Session to a function and then shuts
@@ -74,6 +62,36 @@ def with_session(f):
             session.close()
         return res
     return inner
+
+def load_config_json(conffile):
+    """Loads a specified JSON file and then feeds the configuration from it to
+       set_config()
+    """
+    set_config(parse_json_file(conffile))
+
+def set_config(json_conf):
+    """Applies configuration from the supplied dict.
+    """
+
+    global DB
+    global BL
+    global EXTRA_STATES
+
+    if 'DBDetails' in json_conf:
+        DB = json_conf['DBDetails']
+
+    if 'BoostLevels' in json_conf:
+        BL = json_conf['BoostLevels']
+
+        if 'levels' not in BL:
+            BL['levels'] = tuple()
+            BL['capacity'] = tuple()
+
+    if 'MachineStates' in json_conf:
+        EXTRA_STATES = json_conf['MachineStates']['state_list']
+        #FIXME - this should make sense here, but we can't initiate the
+        #database connection until the DB config is loaded.
+        #setup_states()
 
 
 def choose_engine(enginestring, replace=True):
@@ -155,10 +173,9 @@ def get_state_list():
             'Error'
             )
 
-    try:
-        from eos_db.settings import MachineStates as EXTRA_STATES
-        return state_list + tuple(s for s in EXTRA_STATES.state_list if s not in state_list )
-    except:
+    if EXTRA_STATES:
+        return state_list + tuple(s for s in EXTRA_STATES if s not in state_list )
+    else:
         return state_list
 
 
