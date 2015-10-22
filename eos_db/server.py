@@ -20,6 +20,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timedelta
+from copy import deepcopy
 from eos_db.json_loader import parse_json_file
 
 engine = None  # Assume no default database connection
@@ -89,9 +90,9 @@ def set_config(json_conf):
 
     if 'MachineStates' in json_conf:
         EXTRA_STATES = json_conf['MachineStates']['state_list']
-        #FIXME - this should make sense here, but we can't initiate the
-        #database connection until the DB config is loaded.
-        #setup_states()
+        #It's tempting to call setup_states() here, but we can't initiate the
+        #database connection until the DB config is loaded, so it stays on the
+        #end of choose_engine()
 
 
 def choose_engine(enginestring, replace=True):
@@ -198,7 +199,43 @@ def setup_states(ignore_dupes=True):
     return states_added
 
 def get_boost_levels():
-    return BL
+    """List the boost levels configured on this server.  If a capacity table has
+       been supplied it will also say, for each level, whether it is available.
+    """
+    if not BL.get('capacity'):
+        return(BL)
+
+    #Really?
+    bl_copy = deepcopy(BL)
+
+    #Now I need to find the number of machines at each level.  Unfortunately
+    #due to the database setup this involves much looping.
+    lev_tally = list_servers_by_boost_level()
+
+    #Now I want to see if adding 1 to each value in lev_tally results in a valid
+    #capacity row.  Remember that we are always pushing an unboosted machine
+    #into a boost state.  I'm going to work from the top level, and as soon
+    #as I get a True I'll assume that all lower boosts are also OK.
+    #Therefore I'm looking for the top_boost_level
+    top_boost_level = -1
+    for lev in range(len(lev_tally)-1,-1,-1):
+        lev_target = lev_tally.copy()
+        lev_target[lev] += 1
+
+        for cap_line in bl_copy['capacity']:
+            # What's a neat way to say "all values in lev_target are <= the
+            # corresponding value in cap_line"?  Like this...
+            if max([ x-y for x, y in zip(lev_target, cap_line)]) <= 0:
+                top_boost_level = lev
+                break
+
+        if top_boost_level >= 0:
+            break
+
+    for lev in range(len(bl_copy['levels'])):
+        bl_copy['levels'][lev]['available'] = 1 if lev <= top_boost_level else 0
+
+    return bl_copy
 
 @with_session
 def list_user_ids(session):
@@ -476,7 +513,7 @@ def get_deboost_credits(artifact_id, hours, session):
     #an exact match.
     cores, ram = get_latest_specification(artifact_id, session=session)
     multiplier = 0
-    for lev in get_boost_levels()["levels"]:
+    for lev in BL["levels"]:
         if(cores >= lev['cores'] and ram >= lev['ram']):
             multiplier = lev['cost']
 
@@ -507,6 +544,38 @@ def list_servers_by_state(session):
         else:
             state_table[s_state] = [ server_id ]
     return state_table
+
+@with_session
+def list_servers_by_boost_level(session):
+    """ Iterates through the servers and bins them by boost level.
+    """
+    # Borrowing code from the function above and from get_deboost_credits
+    all_levels =  BL["levels"]
+    lev_tally = [0] * len(all_levels)
+
+    servers = session.query(Artifact.name).distinct()
+    for server_name in servers:
+        #Remember that adding a duplicate named server overwrites the old one,
+        #so we can't just grab all the server IDs in the table.
+        server_id = get_server_id_from_name(server_name[0])
+
+        try:
+            cores, ram = get_latest_specification(server_id, session=session)
+
+            vm_lev = -1
+            for i, lev in enumerate(all_levels):
+                if(cores >= lev['cores'] and ram >= lev['ram']):
+                    vm_lev = i
+
+            if vm_lev >= 0:
+                lev_tally[vm_lev] += 1
+        except:
+            #No worries, we just ignore this machine
+            pass
+
+    #That was harder than it could have been, but there you go.
+    return lev_tally
+
 
 def touch_to_add_ownership(artifact_id, user_id):
     """ Adds an ownership resource to an artifact, effectively linking the VM
@@ -610,7 +679,7 @@ def check_and_remove_credits(actor_id, ram, cores, hours):
     #translates back to a real boost level and work out the cost.  If there is no exact
     #match we must fail.
     multiplier = -1
-    for lev in get_boost_levels()["levels"]:
+    for lev in BL["levels"]:
         if(cores == lev['cores'] and ram == lev['ram']):
             multiplier = lev['cost']
 

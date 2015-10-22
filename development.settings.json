@@ -1,6 +1,7 @@
 {
     /* This is an example settings file. Note: if you edit it, use
-     * "json_pp < foo.settings.json" to ensure it is still valid JSON. */
+     * "json_pp < foo.settings.json" to ensure it is still valid JSON.
+     * JS-style comments like this or with //... are allowed. */
 
     "DBDetails" : {
 
@@ -44,25 +45,25 @@
 	      "ram"    :  400 ,
 	      "cores"  :  16,
 	      "cost"   :  12          }
+	],
+
+	/* Capacity table, as determined by Andy Bowery.  Each tuple is
+	 *   ( state[0].max, state[1].max, state[2].max, ... )
+	 *   The number of machines in the baseline state is not checked,
+	 *   but on the EOS cloud we assume we can start 20 in total.
+	 */
+
+	"capacity" : [
+	    [ 20,  0,  0 ],
+	    [ 19,  1,  0 ],
+	    [ 17,  2,  0 ],
+	    [ 12,  3,  0 ],
+	    [  6,  4,  0 ],
+	    [  0,  5,  0 ],
+	    [ 10,  0,  1 ],
+	    [  5,  1,  1 ]
 	]
     },
-
-    /* Capacity table, as determined by Andy Bowery.  Each tuple is
-     *   ( state[0].max, state[1].max, state[2].max, ... )
-     *   The number of machines in the baseline state is not checked,
-     *   but on the EOS cloud we assume we can start 20 in total.
-     */
-
-    "Capacity" : [
-        [ 20,  0,  0 ],
-        [ 19,  1,  0 ],
-        [ 17,  2,  0 ],
-        [ 12,  3,  0 ],
-        [  6,  4,  0 ],
-        [  0,  5,  0 ],
-        [ 10,  0,  1 ],
-        [  5,  1,  1 ]
-    ],
 
     /* Valid extra states that machines can be put into.  Some states are
      * special and necessary to the operation of eos-db while others are
