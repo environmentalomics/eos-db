@@ -111,17 +111,17 @@ def choose_engine(enginestring, replace=True):
         return
 
     if enginestring == "PostgreSQL":
-        if DB and DB.__dict__.get('username'):
+        if DB and DB.get('username'):
             # Password auth
             engine = create_engine('postgresql://%s:%s@%s/%s'
-                                   % (DB.username,
-                                      DB.password,
-                                      DB.host,
-                                      DB.database),
+                                   % (DB['username'],
+                                      DB['password'],
+                                      DB['host'],
+                                      DB['database']),
                                    echo=False)
         elif DB:
             engine = create_engine('postgresql:///%s'
-                                   % (DB.database),
+                                   % (DB['database']),
                                    echo=False)
         else:
             engine = create_engine('postgresql:///eos_db', echo=False)
