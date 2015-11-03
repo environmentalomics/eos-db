@@ -10,6 +10,10 @@ from http.cookiejar import DefaultCookiePolicy
 # Depend on test.ini in the same dir as thsi file.
 test_ini = os.path.join(os.path.dirname(__file__), 'test.ini')
 
+# We do test the comment scrubber directly
+from eos_db.json_loader import parse_json_fh
+from io import StringIO as sio
+
 class TestJSONConf(unittest.TestCase):
     """Tests that the configuration file is loaded.
     """
@@ -52,3 +56,27 @@ class TestJSONConf(unittest.TestCase):
 
         sl = server.get_state_list()
         self.assertEqual(sl[-1], 'Test2ExtraState')
+
+    def test_json_scrubber(self):
+        """My JSON parser accepts comments.  Test that."""
+        j = parse_json_fh(sio('{"some": "normal json"}'))
+        self.assertEqual(  j,  {"some": "normal json"} )
+
+        j = parse_json_fh(sio('{"some": "/*normal*/ json //"}'))
+        self.assertEqual(  j,  {"some": "/*normal*/ json //"} )
+
+        j = parse_json_fh(sio('{"some": /* \'"\' "commenty" */ "json"}'))
+        self.assertEqual(  j,  {"some": "json"} )
+
+        j = parse_json_fh(sio('{"some": "commenty" // json\'} \n}'))
+        self.assertEqual(  j,  {"some": "commenty"} )
+
+        j = None
+        e = None
+        with self.assertWarns(UserWarning):
+            try:
+                j = parse_json_fh( sio('{"some": \'single quotey\' // json\'} \n}') )
+            except Exception as _e:
+                e = _e
+        self.assertEqual(j, None)
+        self.assertEqual(e.__class__, ValueError)
