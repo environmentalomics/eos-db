@@ -234,6 +234,19 @@ class TestAgentAPI(unittest.TestCase):
         dj3 = app.get('/deboost_jobs', dict(past=12*60)).json
         self.assertEqual( set(s['artifact_name'] for s in dj3), set(('srv3',)) )
 
+    def test_get_servers(self):
+        #When an agent asks to see servers all servers should be seen
+
+        user_id1 = create_user('someuser1')
+        user_id2 = create_user('someuser2')
+        #If a server is added twice, only the last version should be seen.
+        vm1 = create_server('srv1', user_id1)
+        vm2 = create_server('srv2', user_id1)
+        vm3 = create_server('srv1', user_id2)
+
+        res = self._get_test_app().get('/servers').json
+
+        self.assertEqual(len(res), 2)
 
 ###############################################################################
 # Helper code, lets me modify file contents on-the-fly.                       #

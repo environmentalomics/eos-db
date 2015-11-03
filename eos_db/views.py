@@ -275,7 +275,12 @@ def retrieve_servers(request):
     """
     Lists all artifacts related to the current user.
     """
-    user_id = server.get_user_id_from_name(request.authenticated_userid)
+    user_id = None
+    try:
+        user_id = server.get_user_id_from_name(request.authenticated_userid)
+    except:
+        pass
+        #This should only happen if the user is an agent, right?
     server_list = server.list_artifacts_for_user(user_id)
     return list(server_list)
 

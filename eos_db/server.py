@@ -43,6 +43,7 @@ def with_session(f):
        the session down at the end, unless a session was already passed through.
        The decorator itself takes no arguments.  The function must have a session
        argument.
+       This would be much easier if we just had a session handle, surely?
     """
     def inner(*args, **kwargs):
         #Note that if session is passed in kwargs the local session
@@ -333,6 +334,7 @@ def list_artifacts_for_user(user_id, session):
     user's artifacts.
 
     :param user_id: A valid user id for which we want to list details.
+                    If None, all VMs will be returned
     :returns: List of dictionaries containing pertinent info.
     """
     # This bit was  _list_artifacts_for_user(user_id)
@@ -355,7 +357,7 @@ def list_artifacts_for_user(user_id, session):
         #END workaround
         if server[1] in artifacts:
             del artifacts[server[1]]
-        if check_ownership(server[0], user_id, session=session):
+        if user_id is None or check_ownership(server[0], user_id, session=session):
             artifacts[server[1]] = return_artifact_details(*server, session=session)
     return artifacts.values()
 
