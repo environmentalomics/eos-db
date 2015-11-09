@@ -278,7 +278,7 @@ class TestUserAPI(unittest.TestCase):
         self.assertEqual(user_info['credits'], 103)
 
         #Check the server
-        info_expected = dict(boosted="Boosted", boostremaining="19 hrs, 59 min", ram="40 GB", cores="2")
+        info_expected = dict(boosted="Boosted", boostremaining="19 hrs, 59 min", ram="40", cores="2")
         server_info = self.app.get('/servers/boostme').json
         #Remove items I don't want to compare from server_info
         info_got = {k:str(server_info[k]) for k in server_info if k in info_expected}
@@ -293,7 +293,7 @@ class TestUserAPI(unittest.TestCase):
         self.assertEqual(user_info['credits'], 122)
 
         #Check the server once more.
-        info_expected = dict(boosted="Unboosted", boostremaining="N/A", ram="16 GB", cores="1")
+        info_expected = dict(boosted="Unboosted", boostremaining="N/A", ram="16", cores="1")
         server_info = self.app.get('/servers/boostme').json
         #Remove items I don't want to compare from server_info
         info_got = {k:str(server_info[k]) for k in server_info if k in info_expected}

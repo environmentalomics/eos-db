@@ -387,7 +387,7 @@ def return_artifact_details(artifact_id, artifact_name=None, artifact_uuid=None,
 
     try:
         cores, ram = get_latest_specification(artifact_id, session=session)
-        ram = str(ram) + " GB"
+        ram = str(ram)
     except:
         cores, ram = "N/A", "N/A"
     if state == None:
