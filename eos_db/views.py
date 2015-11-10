@@ -503,16 +503,12 @@ def deboost_server(request):
     #Scheduled timeouts don't need cancelling as they are ignored on unboosted servers,
     #and if the user re-boosts then the new timeout will mask the old one.
 
-    #This call will return the baseline if there is no previous spec.
-    prev_cores, prev_ram = server.get_previous_specification(vm_id)
+    #Previous semantics would return the VM to the previous state, but this is not
+    #what I really want - altering the baseline in the config should lead to all VMs
+    #ending up in the new state after a Boost/Deboost.
+    new_cores, new_ram = server.get_baseline_specification(vm_id)
 
-    #If we're not careful, with this "go back to previous config" semantics, if a user de-boosts
-    #a server twice they will actually end up setting their baseline config to the boosted specs.
-    #Therefore do a check.
-    current_cores, current_ram = server.get_latest_specification(vm_id)
-
-    if not (prev_ram > current_ram):
-        server.touch_to_add_specification(vm_id, prev_cores, prev_ram)
+    server.touch_to_add_specification(vm_id, new_cores, new_ram)
 
     # Tell the agents to get to work.
     touch_id = server.touch_to_state(actor_id, vm_id, "Pre_Deboosting")

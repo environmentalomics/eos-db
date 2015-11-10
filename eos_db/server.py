@@ -199,11 +199,11 @@ def setup_states(ignore_dupes=True):
 
     return states_added
 
-def get_boost_levels():
+def get_boost_levels(show_if_avail=True):
     """List the boost levels configured on this server.  If a capacity table has
        been supplied it will also say, for each level, whether it is available.
     """
-    if not BL.get('capacity'):
+    if not (BL.get('capacity') and show_if_avail):
         return(BL)
 
     #Really?
@@ -480,19 +480,22 @@ def get_user_id_from_name(name, session):
 
 def _get_server_boost_status(artifact_id, session=None):
     """ Return the boost status (either true/"Boosted" or false/"Unboosted") of the given
-    artifact by ID.  A VM is believed to be boosted if either the RAM or CPU count is higher
-    than the baseline value.
+    artifact by ID.
+    Originally I said a VM was boosted if the RAM or CPU was above the baseline value, but
+    then if I lower the baseline everything shows up boosted.  Therefore say a machine is
+    boosted if the RAM or CPU is >= the lowest boost level.
 
     :param artifact_id: The artifact in question by ID.
     :returns: Bool giving boost status.
     """
     try:
         cores, ram = get_latest_specification(artifact_id, session=session)
-    except:
-        #New machines must be considered to be like this...
-        cores, ram = 0, 0
 
-    return (ram > BL['baseline']['ram']) or (cores > BL['baseline']['cores'])
+        return (ram >= BL['levels'][0]['ram']) and (cores >= BL['levels'][0]['cores'])
+    except:
+        #Maybe the machine is new.  Unboosted then.
+        return False
+
 
 @with_session
 def get_deboost_credits(artifact_id, hours, session):
@@ -869,6 +872,11 @@ def get_previous_specification(vm_id, index=1, session=None):
     except IndexError:
         return BL['baseline']['cores'], BL['baseline']['ram']
 
+def get_baseline_specification(vm_id):
+    """Get the default baseline spec for a VM.  At present this is just the same
+       for all VMs.
+    """
+    return BL['baseline']['cores'], BL['baseline']['ram']
 
 def touch_to_add_node():
     """

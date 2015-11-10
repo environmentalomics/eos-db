@@ -11,7 +11,7 @@ from http.cookiejar import DefaultCookiePolicy
 from unittest.mock import patch
 from pyramid.paster import get_app, get_appsettings
 
-# Depend on test.ini and a secret in the same dir as thsi file.
+# Depend on test.ini and a secret in the same dir as this file.
 test_ini    = os.path.join(os.path.dirname(__file__), 'test.ini')
 secret_file = os.path.join(os.path.dirname(__file__), 'secret_file.txt')
 
@@ -205,6 +205,14 @@ class TestAgentAPI(unittest.TestCase):
         #/get_deboost_jobs returns [ dict(boost_remain=123, artifact_id=..., artifact_name=...)]
         app = self._get_test_app()
 
+	#Need to set a baseline boost level or all machines just show as unboosted
+        new_BL = server.get_boost_levels()
+        new_BL['levels'] = [{ "label" : "is_boosted",
+		              "ram"   :  40,
+		              "cores" :  2,
+		              "cost"  :  1  }]
+        server.set_config(dict(BoostLevels=new_BL))
+
         servers = ['srv1', 'srv2', 'srv3', 'srv4']
         times   = [  -14 ,    -1 ,     0 ,     1 ]
         user_id = create_user('someuser')
@@ -214,7 +222,7 @@ class TestAgentAPI(unittest.TestCase):
             server.touch_to_add_deboost(vm_id, hours)
 
         #Negative time deboost should be OK, and should show as Expired
-        #Confirm the negative-time deboost worked (eternal + internal view)
+        #Confirm the negative-time deboost worked (external + internal view)
         server_1_info = app.get('/servers/srv1').json
         self.assertEqual(server_1_info['boostremaining'], "Expired")
 
