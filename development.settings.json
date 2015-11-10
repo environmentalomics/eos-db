@@ -24,7 +24,7 @@
 
 	/* Baseline state for machines. */
 	"baseline" : { "label" : "Standard",
-		       "ram"   :  16,
+		       "ram"   :  6,
 		       "cores" :  1,
 		       "cost"  :  0  },
 
@@ -34,7 +34,7 @@
 	 */
 	"levels" : [
 	    { "label"  : "Standard+",
-	      "ram"    :  40,
+	      "ram"    :  32,
 	      "cores"  :  2,
 	      "cost"   :  1           },
 	    { "label"  : "Large",
@@ -47,7 +47,8 @@
 	      "cost"   :  12          }
 	],
 
-	/* Capacity table, as determined by Andy Bowery.  Each tuple is
+	/* Capacity table, as determined by Andy Bowery and tweaked Nov 2015
+	 * when baseline size was downgraded.  Each tuple is
 	 *   ( state[0].max, state[1].max, state[2].max, ... )
 	 *   The number of machines in the baseline state is not checked,
 	 *   but on the EOS cloud we assume we can start 20 in total.
@@ -57,11 +58,11 @@
 	    [ 20,  0,  0 ],
 	    [ 19,  1,  0 ],
 	    [ 17,  2,  0 ],
-	    [ 12,  3,  0 ],
-	    [  6,  4,  0 ],
-	    [  0,  5,  0 ],
-	    [ 10,  0,  1 ],
-	    [  5,  1,  1 ]
+	    [ 13,  3,  0 ],
+	    [  8,  4,  0 ],
+	    [  1,  5,  0 ],
+	    [ 12,  0,  1 ],
+	    [  7,  1,  1 ]
 	]
     },
 
